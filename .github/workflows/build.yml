@@ -15,13 +15,16 @@ name: ci
 #              but it is several minutes and a few GB of bandwidth per push.
 #              Set `full` to build all four images and run the whole harness.
 #
-#              History worth keeping: the first push-triggered attempt failed in
-#              the verification step, not the build, with
-#              "mkdir: cannot create directory '/tmp/rea/home': Permission
-#              denied" - the container was started as the runner's uid, and the
-#              image's scratch dir was only writable by its own user. The
-#              entrypoint's HOME fallback is now resilient and the scratch dir is
-#              1777, and the step below exists to keep that true.
+#              History worth keeping, because both failures were real and both
+#              were found only because CI ran the image as a uid it does not
+#              know:
+#               1. "mkdir: cannot create directory '/tmp/rea/home': Permission
+#                  denied" - the entrypoint's HOME fallback died because the
+#                  scratch dir was only writable by the image's own user.
+#               2. "hopper application-support dir" failed on the Ghidra image -
+#                  the check was not engine-gated, and it stat'ed a path under
+#                  a 0750 $HOME that a foreign uid cannot traverse.
+#              Both are fixed, and the steps below keep them fixed.
 on:
   push:
     branches: [main]

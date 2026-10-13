@@ -123,6 +123,7 @@ those checks.
 | `20261013T182120Z` (final full, single image) | **88 passed / 0 failed / 14 skipped, exit 0** before the engine split; checked in at [`docs/verify-summary.txt`](verify-summary.txt) |
 | per-engine full sweep (first, pre-healthcheck-fix images) | all 94/0/14 · ghidra 83/0/18 · hopper 77/0/16 · ida 70/0/19 — **0 failures on all four**; it also caught the leftovers that are now fixed (healthcheck demanding Hopper on every image, `engine.env` shadowed by the `./config` mount, `set -u` aborts on single-engine images) |
 | per-engine full sweep (final images) | see `docs/verify-engines.txt` |
+| **CI, GitHub-hosted runner (quick profile)** | **59 passed / 0 failed / 13 skipped** — run [38474640500](https://github.com/alexmi256/rea-agent-docker/actions/runs/38474640500), ghidra image built on the runner in 8m52s, harness executed as the runner's uid (not the image's), artifact `verification-report-ghidra` uploaded. This run is also the regression test for the two defects CI found: the entrypoint dying on a foreign uid, and the un-gated Hopper state-dir check. |
 
 The committed summary of the last full single-image run is in
 [`docs/verify-summary.txt`](verify-summary.txt); the per-engine table from the
