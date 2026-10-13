@@ -37,15 +37,12 @@ done
 echo
 echo "=== image sizes ==="
 for engine in $ENGINES; do
-    case "$engine" in
-        all)    img="rea-agent:6.4.0-linux-amd64" ;;
-        *)      img="rea-agent-${engine}:6.4.0-linux-amd64" ;;
-    esac
+    img="$("$PROJECT_DIR/scripts/image-name.sh" "$engine")"
     size="$("${DOCKER:-docker}" image inspect "$img" --format '{{.Size}}' 2>/dev/null || echo missing)"
     if [ "$size" != "missing" ]; then
         size="$(awk -v b="$size" 'BEGIN{printf "%.2f GB", b/1024/1024/1024}')"
     fi
-    printf '  %-34s %s\n' "$img" "$size"
+    printf '  %-52s %s\n' "$img" "$size"
 done
 
 if [ "${#failed[@]}" -gt 0 ]; then
