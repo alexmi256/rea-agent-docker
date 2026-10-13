@@ -9,19 +9,41 @@ section "runtime"
 check "node version"        "v(22|24|26)\."           -- node --version
 check "npm present"         "."                        -- npm --version
 check "rea version"         "."                        -- rea --version
-check "rea providers"       "ghidra|hopper"            -- rea providers --json
+if engine_has ida && [ -z "${REA_IDA_MCP_CONFIG:-}" ]; then
+    check "rea providers (no bundled engine)" "." -- rea providers --json
+else
+    check "rea providers"       "ghidra|hopper"            -- rea providers --json
+fi
+
+section "engine profile"
+check "declared engine"      "." -- cat /etc/rea/engine
+check "engine env file"      "." -- cat /etc/rea/engine.env
+check "rea wrapper injects engine env" "^/opt/(ghidra|hopper)" \
+    -- bash -c "rea_engine_env_noop() { :; }; [ -r /etc/rea/engine.env ] && grep -c '^export ' /etc/rea/engine.env >/dev/null && . /etc/rea/engine.env && case \"\$(cat /etc/rea/engine)\" in all|ghidra) echo \"\$GHIDRA_INSTALL_DIR\" ;; all|hopper) echo \"\$HOPPER_LAUNCHER_PATH\" ;; ida) echo /opt/ida ;; esac"
 
 section "analysis engines"
-check "ghidra analyzeHeadless executable" "analyzeHeadless" -- bash -c "ls -l \"$GHIDRA_INSTALL_DIR/support/analyzeHeadless\""
-check "ghidra native decompiler (linux_x86_64)" "linux_x86_64" -- bash -c "find \"$GHIDRA_INSTALL_DIR/Ghidra/Features/Decompiler/os\" -name decompile -type f | head -5"
 check "java runtime"        "openjdk|java"             -- bash -c "java -version 2>&1 | head -1"
 check "javac present"       "."                        -- bash -c "javac -version 2>&1"
-check "hopper launcher executable" "Hopper"            -- bash -c "ls -l \"$HOPPER_LAUNCHER_PATH\""
-check "hopper shared libraries resolve (0 = none missing)" "^0$" \
-    -- bash -c "ldd \"$HOPPER_LAUNCHER_PATH\" | grep -c 'not found' || true"
-check "hopper launcher digest is one REA accepts" "0294ced1|1339f9e5" \
-    -- bash -c "sha256sum \"$HOPPER_LAUNCHER_PATH\""
-check "xvfb present"        "/usr/bin/Xvfb"            -- which Xvfb
+if engine_has ghidra; then
+    check "ghidra analyzeHeadless executable" "analyzeHeadless" -- bash -c "ls -l \"$GHIDRA_INSTALL_DIR/support/analyzeHeadless\""
+    check "ghidra native decompiler (linux_x86_64)" "linux_x86_64" -- bash -c "find \"$GHIDRA_INSTALL_DIR/Ghidra/Features/Decompiler/os\" -name decompile -type f | head -5"
+else
+    _skip "ghidra installation" "not in this image (engine: $(image_engine))"
+fi
+if engine_has hopper; then
+    check "hopper launcher executable" "Hopper"            -- bash -c "ls -l \"$HOPPER_LAUNCHER_PATH\""
+    check "hopper shared libraries resolve (0 = none missing)" "^0$" \
+        -- bash -c "ldd \"$HOPPER_LAUNCHER_PATH\" | grep -c 'not found' || true"
+    check "hopper launcher digest is one REA accepts" "0294ced1|1339f9e5" \
+        -- bash -c "sha256sum \"$HOPPER_LAUNCHER_PATH\""
+    check "xvfb present"        "/usr/bin/Xvfb"            -- which Xvfb
+else
+    _skip "hopper installation" "not in this image (engine: $(image_engine))"
+fi
+if engine_has ida; then
+    check "IDA mount point" "." -- bash -c "ls -ld \"${IDADIR:-/opt/ida}\""
+    check "IDA licence placement helpers" "." -- bash -c "ls -l /opt/rea/scripts/setup-ida-mcp.sh"
+fi
 
 section "static analysis helpers"
 check "pwntools venv python"  "pwntools"               -- bash -c "$REA_PWNTOOLS_PYTHON -c 'import pwn, elftools, unicorn; print(\"pwntools\", pwn.version, \"pyelftools\", elftools.__version__, \"unicorn\", unicorn.__version__)'"

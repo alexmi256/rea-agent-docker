@@ -1,41 +1,114 @@
 # =============================================================================
 #  rea-agent : REA + full reverse-engineering toolchain, MCP-ready
 #
-#    docker compose up -d                      # long-lived analysis container
-#    docker compose exec rea-agent rea doctor --json
-#    docker exec -i rea-agent rea mcp          # stdio MCP (what Hermes spawns)
+#  Four images, one service each - pick the engine you actually use:
+#
+#    docker compose up -d                        # rea-agent     (Ghidra + Hopper)
+#    docker compose --profile ghidra up -d rea-ghidra   # Ghidra only
+#    docker compose --profile hopper up -d rea-hopper   # Hopper only
+#    docker compose --profile ida    up -d rea-ida      # no engine; bring your own IDA
+#
+#  Named services above are the reliable form: a plain `--profile ghidra up -d`
+#  also starts `rea-agent`, because a service without a profile always starts.
+#  `make up-ghidra` / `up-hopper` / `up-ida` do the right thing for you.
+#
+#  Every image carries the same auxiliary toolchain (firmware extraction,
+#  captures, browsers, managed code, Android, debuggers, cross toolchains,
+#  binfmt/QEMU); the images differ only in the native analysis engine and in
+#  what /etc/rea/engine.env advertises. See docs/IMAGES.md.
 #
 #  Optional overlays:
 #    -f compose.http.yml   publish REA's MCP surface over Streamable HTTP
-#    -f compose.ida.yml    IDA Pro (bring your own install + licence)
+#    -f compose.ida.yml    IDA registration (IDA Pro / Home; see docs/ida-variants.md)
 #
 #  Copy .env.example to .env and adjust before the first `up`.
 # =============================================================================
 name: rea-agent
 
+# --- shared build arguments --------------------------------------------------
+x-build-args: &build-args
+  REA_VERSION: ${REA_VERSION:-6.4.0}
+  NODE_VERSION: ${NODE_VERSION:-24.21.0}
+  GHIDRA_VERSION: ${GHIDRA_VERSION:-12.1.4}
+  GHIDRA_ZIP: ${GHIDRA_ZIP:-ghidra_12.1.4_PUBLIC_20260921.zip}
+  GHIDRA_SHA256: ${GHIDRA_SHA256:-}
+  HOPPER_DEB_URL: ${HOPPER_DEB_URL:-}
+  HOPPER_DEB_SHA1: ${HOPPER_DEB_SHA1:-e4f79dff602648a8ff4a88b773875b6bfac0dc65}
+  HOPPER_DEB_BYTES: ${HOPPER_DEB_BYTES:-35755772}
+  INSTALL_CHROME: ${INSTALL_CHROME:-1}
+  INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-1}
+  INSTALL_PWNDBG: ${INSTALL_PWNDBG:-1}
+  INSTALL_WINE: ${INSTALL_WINE:-1}
+  INSTALL_CROSS_TOOLCHAINS: ${INSTALL_CROSS_TOOLCHAINS:-1}
+  # vendor/ida/*.run is installed only when INSTALL_IDA=1
+  INSTALL_IDA: ${INSTALL_IDA:-auto}
+  REA_UID: ${REA_UID:-1000}
+  REA_GID: ${REA_GID:-1000}
+
+# --- engine-independent runtime environment ---------------------------------
+# Engine paths (GHIDRA_INSTALL_DIR, HOPPER_LAUNCHER_PATH, IDADIR) are NOT here:
+# each service sets the ones its own image actually ships, and the image's
+# /etc/rea/engine.env supplies them for `docker run` / bare `rea` invocations.
+#
+# NOTE: REA rejects *empty* values for its own REA_* settings
+# ("configuration_invalid: Too small: expected string to have >=1 characters"),
+# so optional settings are never listed with an empty default. Put them in
+# ./config/rea.env (loaded through env_file, which only defines variables that
+# are actually present).
+x-rea-env: &rea-env
+  # --- auxiliary engines ------------------------------------------------
+  REA_PWNTOOLS_PYTHON: /opt/venvs/pwntools/bin/python
+  REA_PWNDBG_GDB: /usr/bin/gdb
+  REA_PWNDBG_GDBINIT: /opt/pwndbg/gdbinit.py
+  REA_PWNDBG_VENV_PATH: /opt/pwndbg/.venv
+  REA_WABT_BIN_DIRECTORY: /opt/wabt/bin
+  REA_JADX_MCP_JAR: /opt/jadx/jadx-headless-mcp-0.7.1-all.jar
+  REA_APKTOOL_COMMAND: /usr/local/bin/apktool
+  REA_ADB_PATH: /usr/bin/adb
+  REA_BINWALK_COMMAND: /usr/local/bin/binwalk
+  REA_UNBLOB_COMMAND: /opt/venvs/unblob/bin/unblob
+  REA_TSHARK_COMMAND: /usr/bin/tshark
+  REA_CAPINFOS_COMMAND: /usr/bin/capinfos
+  REA_SIGROK_COMMAND: /usr/bin/sigrok-cli
+  REA_MITMDUMP_COMMAND: /opt/venvs/mitmproxy/bin/mitmdump
+  REA_ILSPY_CMD_PATH: /opt/dotnet-tools/ilspycmd
+  # --- JDK (jadx, apktool, ilspycmd) and MCP client shaping -------------
+  JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64
+  REA_MCP_INPUT_SCHEMA_PROFILE: ${REA_MCP_INPUT_SCHEMA_PROFILE:-compact}
+  REA_BROWSER_NO_SANDBOX: ${REA_BROWSER_NO_SANDBOX:-1}
+  PLAYWRIGHT_BROWSERS_PATH: /opt/ms-playwright
+  REA_LOG_LEVEL: ${REA_LOG_LEVEL:-info}
+  REA_ENTRYPOINT_DOCTOR: ${REA_ENTRYPOINT_DOCTOR:-1}
+  TMPDIR: /tmp/rea
+
+# --- environment that only matters when an engine is present -----------------
+x-ghidra-env: &ghidra-env
+  GHIDRA_INSTALL_DIR: ${GHIDRA_INSTALL_DIR:-/opt/ghidra}
+  REA_GHIDRA_STARTUP_TIMEOUT_MS: ${REA_GHIDRA_STARTUP_TIMEOUT_MS:-900000}
+  GHIDRA_HEADLESS_MAXMEM: ${GHIDRA_HEADLESS_MAXMEM:-4G}
+
+x-hopper-env: &hopper-env
+  HOPPER_LAUNCHER_PATH: ${HOPPER_LAUNCHER_PATH:-/opt/hopper/bin/Hopper}
+  HOPPER_STATE_DIR: ${HOPPER_STATE_DIR:-/home/rea/.local/share/hopper}
+  REA_HOPPER_STARTUP_TIMEOUT_MS: ${REA_HOPPER_STARTUP_TIMEOUT_MS:-300000}
+
+# IDA is bring-your-own in every image; these are the mount/registration
+# defaults (see docs/ida-variants.md).
+x-ida-env: &ida-env
+  IDADIR: ${IDADIR:-/opt/ida}
+  REA_IDA_MCP_LOCAL_PORT: ${REA_IDA_MCP_LOCAL_PORT:-8745}
+
 services:
+  # ===========================================================================
+  # rea-agent : Ghidra + Hopper (the "all engines" image, default service)
+  # ===========================================================================
   rea-agent:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        REA_VERSION: ${REA_VERSION:-6.4.0}
-        NODE_VERSION: ${NODE_VERSION:-24.21.0}
-        GHIDRA_VERSION: ${GHIDRA_VERSION:-12.1.4}
-        GHIDRA_ZIP: ${GHIDRA_ZIP:-ghidra_12.1.4_PUBLIC_20260921.zip}
-        GHIDRA_SHA256: ${GHIDRA_SHA256:-}
-        HOPPER_DEB_URL: ${HOPPER_DEB_URL:-}
-        HOPPER_DEB_SHA1: ${HOPPER_DEB_SHA1:-e4f79dff602648a8ff4a88b773875b6bfac0dc65}
-        HOPPER_DEB_BYTES: ${HOPPER_DEB_BYTES:-35755772}
-        INSTALL_CHROME: ${INSTALL_CHROME:-1}
-        INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-1}
-        INSTALL_PWNDBG: ${INSTALL_PWNDBG:-1}
-        INSTALL_WINE: ${INSTALL_WINE:-1}
-        INSTALL_CROSS_TOOLCHAINS: ${INSTALL_CROSS_TOOLCHAINS:-1}
-        REA_UID: ${REA_UID:-1000}
-        REA_GID: ${REA_GID:-1000}
-        # vendor/ida/*.run is installed only when INSTALL_IDA=1
-        INSTALL_IDA: ${INSTALL_IDA:-auto}
+        <<: *build-args
+        REA_ENGINE: all
     image: ${REA_IMAGE:-rea-agent:6.4.0-linux-amd64}
     container_name: ${REA_CONTAINER_NAME:-rea-agent}
     platform: linux/amd64
@@ -49,54 +122,11 @@ services:
     # Docker default.
     shm_size: ${REA_SHM_SIZE:-1gb}
     environment:
-      # --- analysis engine selection -------------------------------------
-      # NOTE: REA rejects *empty* values for its own REA_* settings
-      # ("configuration_invalid: Too small: expected string to have >=1
-      # characters"), so optional settings are NOT listed here with an empty
-      # default. Put them in ./config/rea.env (loaded through env_file below,
-      # which only defines variables that are actually present).
-      GHIDRA_INSTALL_DIR: ${GHIDRA_INSTALL_DIR:-/opt/ghidra}
-      JAVA_HOME: ${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}
-      HOPPER_LAUNCHER_PATH: ${HOPPER_LAUNCHER_PATH:-/opt/hopper/bin/Hopper}
-      HOPPER_STATE_DIR: ${HOPPER_STATE_DIR:-/home/rea/.local/share/hopper}
-      REA_GHIDRA_STARTUP_TIMEOUT_MS: ${REA_GHIDRA_STARTUP_TIMEOUT_MS:-900000}
-      REA_HOPPER_STARTUP_TIMEOUT_MS: ${REA_HOPPER_STARTUP_TIMEOUT_MS:-300000}
-      GHIDRA_HEADLESS_MAXMEM: ${GHIDRA_HEADLESS_MAXMEM:-4G}
-      # --- IDA / JEB mount points (engines themselves are bring-your-own) --
-      IDADIR: ${IDADIR:-/opt/ida}
-      REA_IDA_MCP_LOCAL_PORT: ${REA_IDA_MCP_LOCAL_PORT:-8745}
-      # --- MCP client shaping ---------------------------------------------
-      REA_MCP_INPUT_SCHEMA_PROFILE: ${REA_MCP_INPUT_SCHEMA_PROFILE:-compact}
-      # --- auxiliary engines ----------------------------------------------
-      REA_PWNTOOLS_PYTHON: /opt/venvs/pwntools/bin/python
-      REA_PWNDBG_GDB: /usr/bin/gdb
-      REA_PWNDBG_GDBINIT: /opt/pwndbg/gdbinit.py
-      REA_PWNDBG_VENV_PATH: /opt/pwndbg/.venv
-      REA_WABT_BIN_DIRECTORY: /opt/wabt/bin
-      REA_JADX_MCP_JAR: /opt/jadx/jadx-headless-mcp-0.7.1-all.jar
-      REA_APKTOOL_COMMAND: /usr/local/bin/apktool
-      REA_ADB_PATH: /usr/bin/adb
-      REA_BINWALK_COMMAND: /usr/local/bin/binwalk
-      REA_UNBLOB_COMMAND: /opt/venvs/unblob/bin/unblob
-      REA_TSHARK_COMMAND: /usr/bin/tshark
-      REA_CAPINFOS_COMMAND: /usr/bin/capinfos
-      REA_SIGROK_COMMAND: /usr/bin/sigrok-cli
-      REA_MITMDUMP_COMMAND: /opt/venvs/mitmproxy/bin/mitmdump
-      REA_ILSPY_CMD_PATH: /opt/dotnet-tools/ilspycmd
-      REA_BROWSER_NO_SANDBOX: ${REA_BROWSER_NO_SANDBOX:-1}
-      PLAYWRIGHT_BROWSERS_PATH: /opt/ms-playwright
-      REA_LOG_LEVEL: ${REA_LOG_LEVEL:-info}
-      REA_ENTRYPOINT_DOCTOR: ${REA_ENTRYPOINT_DOCTOR:-1}
-      TMPDIR: /tmp/rea
-    # Optional REA_* settings live here (REA_ANALYSIS_PROVIDER, IDA/JEB MCP
-    # registrations, Ghidra language/seed/analyzer overrides, timeouts,
-    # REA_MCP_MAX_RESPONSE_BYTES, ...). Only variables you actually write are
-    # defined, which keeps REA's config validation happy. Copy the template:
-    #   cp docker/rea.env.example config/rea.env
+      <<: [*rea-env, *ghidra-env, *hopper-env, *ida-env]
     env_file:
       - path: ./config/rea.env
         required: false
-    volumes:
+    volumes: &rea-volumes
       # Analysis workspace: targets to inspect, snapshots, exported Evidence.
       - ./work:/work
       # Read-only sample drop-box (what you ask the agent to analyse).
@@ -107,10 +137,7 @@ services:
       #   config/ida/ida.hexlic              IDA licence file
       #   config/hopper/*                    Hopper state (see docs/BYO-LICENSES.md)
       - ./config:/etc/rea:ro
-      # Persistent per-user state: ~/.rea cache, Hopper application support,
-      # Ghidra scratch, IDA activation, and the extracted IDA install target.
-      - rea-home:/home/rea
-      # IDA Pro install (bring your own). Empty by default -> harmless no-op.
+      # IDA install (bring your own). Empty by default -> harmless no-op.
       - ${IDA_INSTALL_DIR:-./vendor/ida}:/opt/ida:ro
       # Hopper licence/state (optional; see docs/BYO-LICENSES.md).
       - ${HOPPER_STATE_VOLUME:-./vendor/hopper-state}:/home/rea/.local/share/hopper
@@ -121,6 +148,132 @@ services:
       start_period: 120s
       retries: 3
 
+  # ===========================================================================
+  # rea-ghidra : Ghidra only (broadest architecture coverage, no Hopper)
+  # ===========================================================================
+  rea-ghidra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        <<: *build-args
+        REA_ENGINE: ghidra
+    image: ${REA_GHIDRA_IMAGE:-rea-agent-ghidra:6.4.0-linux-amd64}
+    container_name: ${REA_GHIDRA_CONTAINER_NAME:-rea-agent-ghidra}
+    profiles: ["ghidra"]
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    user: "${REA_UID:-1000}:${REA_GID:-1000}"
+    working_dir: /work
+    shm_size: ${REA_SHM_SIZE:-1gb}
+    environment:
+      # REA_ANALYSIS_PROVIDER is already baked into this image's engine.env;
+      # list it here only to make the choice visible/overridable.
+      <<: [*rea-env, *ghidra-env, *ida-env]
+      REA_ANALYSIS_PROVIDER: ${REA_GHIDRA_PROVIDER:-ghidra}
+    env_file:
+      - path: ./config/rea.env
+        required: false
+    volumes:
+      - ./work:/work
+      - ${REA_TARGETS_DIR:-./targets}:/targets:ro
+      - ./config:/etc/rea:ro
+      - ${IDA_INSTALL_DIR:-./vendor/ida}:/opt/ida:ro
+      - rea-ghidra-home:/home/rea
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/rea-agent-healthcheck"]
+      interval: 60s
+      timeout: 90s
+      start_period: 120s
+      retries: 3
+
+  # ===========================================================================
+  # rea-hopper : Hopper only (small, headless demo or your own licensed DEB)
+  # ===========================================================================
+  rea-hopper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        <<: *build-args
+        REA_ENGINE: hopper
+    image: ${REA_HOPPER_IMAGE:-rea-agent-hopper:6.4.0-linux-amd64}
+    container_name: ${REA_HOPPER_CONTAINER_NAME:-rea-agent-hopper}
+    profiles: ["hopper"]
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    user: "${REA_UID:-1000}:${REA_GID:-1000}"
+    working_dir: /work
+    shm_size: ${REA_SHM_SIZE:-1gb}
+    environment:
+      <<: [*rea-env, *hopper-env, *ida-env]
+      REA_ANALYSIS_PROVIDER: ${REA_HOPPER_PROVIDER:-hopper}
+    env_file:
+      - path: ./config/rea.env
+        required: false
+    volumes:
+      - ./work:/work
+      - ${REA_TARGETS_DIR:-./targets}:/targets:ro
+      - ./config:/etc/rea:ro
+      - ${HOPPER_STATE_VOLUME:-./vendor/hopper-state}:/home/rea/.local/share/hopper
+      - rea-hopper-home:/home/rea
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/rea-agent-healthcheck"]
+      interval: 60s
+      timeout: 90s
+      start_period: 120s
+      retries: 3
+
+  # ===========================================================================
+  # rea-ida : no bundled engine. Mount your own IDA (Pro/Home/Free) install and
+  # licence, register an IDA MCP endpoint, and REA analyses natively through it.
+  # IDA Free cannot be used headlessly (no idalib) - see docs/ida-variants.md.
+  # ===========================================================================
+  rea-ida:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        <<: *build-args
+        REA_ENGINE: ida
+    image: ${REA_IDA_IMAGE:-rea-agent-ida:6.4.0-linux-amd64}
+    container_name: ${REA_IDA_CONTAINER_NAME:-rea-agent-ida}
+    profiles: ["ida"]
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    user: "${REA_UID:-1000}:${REA_GID:-1000}"
+    working_dir: /work
+    shm_size: ${REA_SHM_SIZE:-1gb}
+    environment:
+      <<: [*rea-env, *ida-env]
+      REA_IDA_MCP_CONFIG: ${REA_IDA_MCP_CONFIG:-/etc/rea/ida-mcp.json}
+    env_file:
+      - path: ./config/rea.env
+        required: false
+    volumes:
+      - ./work:/work
+      - ${REA_TARGETS_DIR:-./targets}:/targets:ro
+      - ./config:/etc/rea:ro
+      - ${IDA_INSTALL_DIR:-./vendor/ida}:/opt/ida:ro
+      - ${IDA_LICENSE_DIR:-./config/ida}:/etc/rea/ida:ro
+      - ${IDA_MCP_CONFIG_FILE:-./config/ida-mcp.json}:/etc/rea/ida-mcp.json:ro
+      - rea-ida-home:/home/rea
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/rea-agent-healthcheck"]
+      interval: 60s
+      timeout: 90s
+      start_period: 120s
+      retries: 3
+
 volumes:
   rea-home:
     name: ${REA_HOME_VOLUME:-rea-agent-home}
+  rea-ghidra-home:
+    name: ${REA_HOME_VOLUME:-rea-agent-home}-ghidra
+  rea-hopper-home:
+    name: ${REA_HOME_VOLUME:-rea-agent-home}-hopper
+  rea-ida-home:
+    name: ${REA_HOME_VOLUME:-rea-agent-home}-ida

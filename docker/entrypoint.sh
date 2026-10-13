@@ -83,9 +83,16 @@ fi
 [ -n "${REA_JEB_MCP_URL:-}" ] && log "JEB MCP endpoint: ${REA_JEB_MCP_URL}"
 
 # --- 5. startup summary -------------------------------------------------------
+engine="$(cat /etc/rea/engine 2>/dev/null || echo all)"
+log "engine profile: ${engine}"
+if [ "$engine" = "ida" ] && [ -z "${REA_IDA_MCP_CONFIG:-}" ]; then
+    log "note: this image bundles no analysis engine. Provide IDA + a registration:"
+    log "note:   /opt/rea/scripts/setup-ida-mcp.sh <idalib|official|sidecar|attached|native>"
+fi
+
 if [ "${REA_ENTRYPOINT_DOCTOR:-0}" = "1" ] && command -v rea >/dev/null 2>&1; then
     log "provider summary:"
-    rea providers --json 2>&1 | head -40 >&2 || log "reas providers check failed"
+    rea providers --json 2>&1 | head -40 >&2 || log "rea providers check failed"
 fi
 
 log "ready: rea $(rea --version 2>/dev/null || echo '?') | node $(node --version 2>/dev/null || echo '?') | user $(id -un)"

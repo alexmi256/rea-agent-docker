@@ -2,10 +2,11 @@
 # =============================================================================
 # Run the in-image verification harness against a throwaway container.
 #
-#   scripts/verify.sh                 # everything (Ghidra multi-arch, Hopper, MCP)
-#   scripts/verify.sh --quick         # tool presence, static analysis, MCP handshake
+#   scripts/verify.sh                      # the default (all-engines) image
+#   scripts/verify.sh --quick              # tool presence, static analysis, MCP handshake
 #   scripts/verify.sh --only tools,mcp
-#   scripts/verify.sh --compose       # exec the harness in the compose service
+#   scripts/verify.sh --image rea-agent-hopper:6.4.0-linux-amd64
+#   scripts/verify.sh --compose --service rea-ghidra   # exec inside a compose service
 # =============================================================================
 set -euo pipefail
 
@@ -14,19 +15,21 @@ HOST_PATH_MAP="${HOST_PATH_MAP:-/opt/data=/flashcache/hermes}"
 IMAGE="${REA_IMAGE:-rea-agent:6.4.0-linux-amd64}"
 DOCKER="${DOCKER:-docker}"
 COMPOSE=0
+SERVICE="${REA_SERVICE:-rea-agent}"
 ARGS=()
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --image) IMAGE="$2"; shift 2 ;;
         --compose) COMPOSE=1; shift ;;
-        -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+        --service) SERVICE="$2"; shift 2 ;;
+        -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
         *) ARGS+=("$1"); shift ;;
     esac
 done
 
 if [ "$COMPOSE" = "1" ]; then
-    exec docker compose -f "$PROJECT_DIR/docker-compose.yml" exec -T rea-agent \
+    exec docker compose -f "$PROJECT_DIR/docker-compose.yml" exec -T "$SERVICE" \
         /opt/rea/verify/verify-all.sh ${ARGS[@]+"${ARGS[@]}"}
 fi
 

@@ -14,11 +14,16 @@ engineering without installing a single tool on the host.
   pinned helper version from apt.
 * **Engines:** Ghidra 12.1.4 (multi-architecture, the default), Hopper 6.4.2
   (public demo, headless via Xvfb), IDA Pro/Home/Free (bring your own licence).
+* **Four images, one per engine:** `rea-agent` (Ghidra + Hopper), `rea-agent-ghidra`,
+  `rea-agent-hopper`, `rea-agent-ida` (no bundled engine). Same auxiliary
+  toolchain in all four — pick the disassembler you actually use:
+  [docs/IMAGES.md](docs/IMAGES.md).
 * **Surface:** REA's MCP server, ~170 tools, stdio by default (spawned by the
   client through `docker exec`) or Streamable HTTP via an optional bridge.
 * **Verified:** the image ships a harness that actually runs the engines —
   `scripts/verify.sh` builds fixtures for eight architectures/format families
-  and analyses them through the providers, then does a real MCP handshake.
+  and analyses them through the providers, then does a real MCP handshake. It is
+  engine-aware, so the same harness verifies all four images.
 
 ---
 
@@ -27,19 +32,27 @@ engineering without installing a single tool on the host.
 ```bash
 git clone <this repo> rea-agent-docker && cd rea-agent-docker
 cp .env.example .env          # set REA_UID/REA_GID to your host user
-docker compose build          # ~10-25 min first time, ~7-9 GB image
-docker compose up -d
-docker compose exec rea-agent rea doctor --json
+
+# build the engine you use (or `make build-all` for all four)
+make build-ghidra             # ~10-25 min first time
+docker compose --profile ghidra up -d rea-ghidra
+docker compose exec rea-ghidra rea doctor --json
 ```
 
+Bare `make build` / `docker compose up -d` builds and runs the all-engines image
+(`rea-agent`, Ghidra + Hopper). The per-engine images are
+`rea-agent-ghidra`, `rea-agent-hopper` and `rea-agent-ida` — see
+[docs/IMAGES.md](docs/IMAGES.md) for what each carries and when to choose it.
+
 Then point your MCP client at it (Hermes block ready to paste:
-[`scripts/hermes-mcp.yaml`](scripts/hermes-mcp.yaml)):
+[`scripts/hermes-mcp.yaml`](scripts/hermes-mcp.yaml)) — only the container name
+changes between engines:
 
 ```yaml
 mcp_servers:
   rea:
     command: "docker"
-    args: ["exec", "-i", "rea-agent", "rea", "mcp"]
+    args: ["exec", "-i", "rea-agent-ghidra", "rea", "mcp"]   # rea-agent-hopper / rea-agent-ida
     timeout: 1800
     connect_timeout: 120
 ```
@@ -48,8 +61,8 @@ Ask it something with a real target:
 
 ```bash
 cp suspicious.elf targets/
-docker compose exec rea-agent rea search /targets/suspicious.elf "licence" --provider ghidra --json
-docker compose exec rea-agent rea decompile /targets/suspicious.elf main --provider ghidra --json
+docker compose exec rea-ghidra rea search /targets/suspicious.elf "licence" --provider ghidra --json
+docker compose exec rea-ghidra rea decompile /targets/suspicious.elf main --provider ghidra --json
 ```
 
 Full walkthrough: [docs/HERMES-MCP.md](docs/HERMES-MCP.md).
@@ -98,52 +111,74 @@ project therefore never downloads IDA; it consumes your own installer/installati
 and can run the MCP server for it either inside this container or as a sidecar
 (`compose.ida.yml`, `ida/README.md`).
 
+### IDA or IDA Pro — the same program
+
+They are not two engines to choose between. Hex-Rays ships **one** IDA and sells
+it under four plans (IDA Free / Classroom / Home / Pro); the `ida.hexlic` licence
+file decides what is unlocked, and their install guide applies to "all product
+versions: IDA Pro, IDA Home, or IDA Free". The rows that matter for automation
+are **idalib** (headless - Pro, Home and Classroom have it, **Free does not**)
+and **IDAPython/C++ SDK** (Free has neither), plus decompilers: IDA Pro
+decompiles locally, Home and Free use Hex-Rays' cloud service. So IDA Free can
+only ever reach REA through the third-party `ida-free-mcp` plugin attached to a
+running GUI. Full breakdown, decision table and mounting instructions:
+[docs/ida-variants.md](docs/ida-variants.md).
+
 ---
 
 ## How REA's IDA "own MCP" question resolves
 
-REA does not embed IDA support: it **adapts an existing upstream IDA MCP
-server** (`docs/ida-provider.md` in the REA repo). Practically:
+Yes — REA does not embed IDA support: it **adapts an existing upstream IDA MCP
+server** (`docs/ida-provider.md` in the REA repo), so you can run that server
+wherever your licence lives, inside this container or as a sidecar. Practically:
 
+* **Headless** — `idalib-mcp` (from `mrexodia/ida-pro-mcp`, database-supervisor
+  API) or the official Hex-Rays `ida-mcp` server. Needs **idalib**, so IDA Pro,
+  IDA Home or IDA Classroom; **IDA Free has no idalib**. This is the profile REA
+  was verified against, and the one to use for unattended containers.
 * **Attached** — an IDA GUI with `ida-pro-mcp`'s legacy 1.4.0 tools already has
   the original binary open; REA connects through the upstream stdio proxy and
   never saves or closes your database. (Upstream's `main` is 2.0.0 now and
   serves neither supported profile — pin the versions.)
-* **Headless** — `idalib-mcp` (from `mrexodia/ida-pro-mcp`) or the official
-  Hex-Rays `ida-mcp` server (IDA 9.4+ / IDALib), over stdio or Streamable HTTP.
-  IDA **Free** has no IDALib, so it can only be used in attached/native mode.
-* **Native** — `ida-free-mcp` plugin for IDA Free, attached, HTTP.
+* **Native** — the `ida-free-mcp` plugin for IDA Free, attached, HTTP. The only
+  route that works with a free IDA; needs a GUI and IDA Free's cloud decompiler.
+* **Sidecar** — any of the above running in another container/VM/host, reached
+  over loopback (below).
 
 Because REA accepts only loopback endpoints for IDA/JEB, this container forwards
 a remote/sidecar MCP server onto its own `127.0.0.1` (`REA_IDA_MCP_FORWARD`,
 implemented with `socat` in the entrypoint). Templates for each profile live in
 [`assets/`](assets/), and `scripts/setup-ida-mcp.sh` writes and validates a
-registration inside the container.
+registration inside the container. Which IDA edition unlocks which mode, and how
+to mount each: [docs/ida-variants.md](docs/ida-variants.md).
 
 ---
 
 ## Layout
 
 ```
-Dockerfile                 single multi-stage build (binwalk stage + runtime)
-docker-compose.yml         the service, volumes, engine env, healthcheck
+Dockerfile                 single multi-stage build; one engine (REA_ENGINE) +
+                           engine marker/env/wrapper; binwalk builder stage
+docker-compose.yml         four services (rea-agent, -ghidra, -hopper, -ida)
 compose.http.yml           optional Streamable HTTP MCP bridge (port 8811)
-compose.ida.yml            optional IDA provider overlay (+ sidecar profile)
+compose.ida.yml            optional IDA registration overlay (+ sidecar profile)
 .env.example               every knob, documented
-Makefile                   build / up / doctor / verify / shell
+Makefile                   build / up / doctor / verify / sizes, per engine
 vendor/                    bring-your-own artefacts (licences) — gitignored
 ida/README.md              how to build your own private IDA MCP sidecar
 assets/ida-mcp.*.json      IDA MCP registration templates per profile
 docker/entrypoint.sh       overrides, licence placement, loopback forwards
-docker/healthcheck.sh      fast readiness probe (REA + Node + engines)
+docker/healthcheck.sh      engine-aware readiness probe
 docker/rea.env.example     runtime override template (→ config/rea.env)
-docker/verify/             the in-image verification harness
-scripts/build.sh           build (with Docker-outside-of-Docker path mapping)
+docker/verify/             the in-image, engine-aware verification harness
+scripts/build.sh           build one engine image (path-mapped for DooD)
+scripts/build-all.sh       build all four, then report sizes
 scripts/verify.sh          run the harness in a throwaway container
 scripts/setup-ida-mcp.sh   wire IDA into REA (6 modes)
 scripts/hermes-mcp.yaml    paste-ready Hermes MCP block
-docs/                      architecture, BYO licences, multi-arch, MCP, troubleshooting
-.github/workflows/         CI: build + quick verification, full on demand
+docs/                      images, architecture, BYO licences, IDA editions,
+                           multi-arch, MCP, troubleshooting, verification
+.github/workflows/         CI: build + verify per engine, full on demand
 ```
 
 ---
@@ -158,19 +193,27 @@ and nothing is downloaded by the harness.
 ```bash
 scripts/verify.sh --quick      # tools + static analysis + MCP handshake (~2 min)
 scripts/verify.sh              # everything, including Ghidra multi-arch + Hopper
-make verify                    # same, inside the compose service
+make verify ENGINE=ghidra      # same, against the Ghidra-only image
+make verify ENGINE=hopper      # ... the Hopper-only image
+make verify ENGINE=ida         # ... the engine-less IDA image (native checks skip)
 ```
+
+The harness is engine-aware: it reads `/etc/rea/engine` and **skips** checks for
+engines the image does not ship rather than failing them, so one harness serves
+all four images. A skip always states the reason (`not in this image (engine:
+hopper)`), and the `ida` image additionally reports that native analysis needs a
+registered IDA.
 
 Phases:
 
 | Phase | What it proves |
 | ----- | -------------- |
-| `tools` | each helper exists and reports a version REA admits (e.g. WABT must say 1.0.42, sigrok-cli 0.7.2, mitmdump 12.2.3) |
-| `analysis` | `rea doctor --provider ghidra/hopper` healthy; Ghidra analyses **x86-64, aarch64, armv7, MIPS32 BE, MIPS32 LE, RISC-V64, PowerPC, Windows PE32+**; decompiles; string search; Hopper demo-mode analysis of the x86-64 fixture |
+| `tools` | the image's declared engine profile, the engine paths it advertises, and each helper reporting a version REA admits (e.g. WABT must say 1.0.42, sigrok-cli 0.7.2, mitmdump 12.2.3) |
+| `analysis` | for the images that have them: `rea doctor --provider ghidra/hopper` healthy; Ghidra analyses **x86-64, aarch64, armv7, MIPS32 BE, MIPS32 LE, RISC-V64, PowerPC, Windows PE32+**; decompiles; string search; Hopper demo-mode analysis of the x86-64 fixture |
 | `static` | `inspect-binary-layout` (pwntools), `inspect-wasm-artifact` (WABT), `inspect-sqlite-database`, `inspect-managed-artifact`/`-members` (.NET), `inspect-plist`, `inspect-evm-interface`, `analyze-javascript-application`, `import-reference-source` |
 | `capture` | tshark pcap fields/summary, sigrok VCD decode, binwalk regions, unblob extraction, HAR + a **real mitmdump capture**, Chrome CDP target discovery/page/screenshot capture, Playwright scenario (launch+click+DOM), PTY process capture |
 | `clients` | Frida device inventory, adb client/devices, Apktool launcher, JADX engine JAR, IDA registration acceptance, JEB endpoint, Hopper state dir |
-| `mcp` | a real MCP client (`docker/verify/mcp-probe.mjs`): `initialize` → `tools/list` (~170 tools) → `tools/call inspect_sqlite_database` → `open_binary` + `analyze_function` + `close_binary` through Ghidra; then the Streamable HTTP bridge is started and initialised over HTTP |
+| `mcp` | a real MCP client (`docker/verify/mcp-probe.mjs`): `initialize` → `tools/list` (~170 tools) → `tools/call inspect_sqlite_database` → where the image has an engine, `open_binary` + `analyze_function` + `close_binary` through it; then the Streamable HTTP bridge is started and initialised over HTTP |
 
 Reports land in `work/verify-reports/<timestamp>/` — `summary.txt` plus raw
 stdout/stderr per check in `logs/`, so a failure is always inspectable.

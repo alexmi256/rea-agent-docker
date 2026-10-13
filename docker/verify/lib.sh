@@ -93,6 +93,32 @@ check_json_file() {
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# --- engine awareness --------------------------------------------------------
+# Each image declares the engine(s) it ships in /etc/rea/engine (written at
+# build time from the REA_ENGINE build arg). Checks for an engine the image
+# does not carry are SKIPped, so one harness serves all four images.
+image_engine() { cat /etc/rea/engine 2>/dev/null || echo all; }
+engine_has() { # engine_has ghidra|hopper|ida
+    local e; e="$(image_engine)"
+    [ "$e" = "all" ] || [ "$e" = "$1" ]
+}
+
+# Default the MCP probe's provider to whatever this image ships, and switch off
+# its native-analysis step when the image has no engine (engine=ida with no IDA
+# registration) - the handshake itself must still be verified there.
+case "$(image_engine)" in
+    ghidra) export REA_VERIFY_PROVIDER="${REA_VERIFY_PROVIDER:-ghidra}" ;;
+    hopper) export REA_VERIFY_PROVIDER="${REA_VERIFY_PROVIDER:-hopper}" ;;
+    all)    export REA_VERIFY_PROVIDER="${REA_VERIFY_PROVIDER:-ghidra}" ;;
+    ida)
+        if [ -n "${REA_IDA_MCP_CONFIG:-}" ]; then
+            export REA_VERIFY_PROVIDER="${REA_VERIFY_PROVIDER:-ida}"
+        else
+            export REA_VERIFY_MCP_ANALYSIS=0
+        fi
+        ;;
+esac
+
 # --- release-aware helpers ---------------------------------------------------
 # REA's catalog differs between the npm release and repository main (main is
 # ahead: sqlite/wasm/go/pcap/signal/frida families are not in 6.4.0). A family

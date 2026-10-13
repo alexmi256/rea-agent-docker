@@ -66,6 +66,17 @@ ARG UNICORN_VERSION=2.1.2
 ARG ILSPYCMD_VERSION=8.2.0.7535
 ARG CHROME_DEB_URL=https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 
+# --- engine selection --------------------------------------------------------
+# Which native analysis engine(s) this image ships:
+#   all    -> Ghidra + Hopper (current default, largest)
+#   ghidra -> Ghidra only
+#   hopper -> Hopper only
+#   ida    -> no bundled engine: bring your own IDA install + licence and an
+#             IDA MCP registration (see docs/ida-variants.md)
+# The rest of REA's toolchain (firmware, captures, managed code, browsers,
+# Android, debuggers, cross toolchains) is identical in all four images.
+ARG REA_ENGINE=all
+
 # --- optional components -----------------------------------------------------
 ARG INSTALL_CHROME=1
 ARG INSTALL_PLAYWRIGHT=1
@@ -156,92 +167,24 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
 #    Ships decompilers/languages for x86, x86-64, ARM/Thumb, AArch64, MIPS,
 #    PowerPC, RISC-V, SuperH, 6502, Z80, 16-bit DOS, ... -> this is what makes
 #    Hopper/IDA's narrower architecture coverage a non-issue.
+#    Included in REA_ENGINE=all and REA_ENGINE=ghidra.
 # =============================================================================
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
-    GHIDRA_INSTALL_DIR=/opt/ghidra
-RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
-    set -eux; \
-    cd /var/cache/rea-dl; \
-    [ -f "${GHIDRA_ZIP}" ] || curl -fsSLo "${GHIDRA_ZIP}" \
-      "${GHIDRA_BASE_URL}/Ghidra_${GHIDRA_VERSION}_build/${GHIDRA_ZIP}"; \
-    if [ -n "${GHIDRA_SHA256}" ]; then echo "${GHIDRA_SHA256}  ${GHIDRA_ZIP}" | sha256sum -c -; fi; \
-    sha256sum "${GHIDRA_ZIP}" | tee /tmp/ghidra-zip.sha256; \
-    mkdir -p /opt/ghidra-extract; \
-    unzip -q "${GHIDRA_ZIP}" -d /opt/ghidra-extract; \
-    mv "/opt/ghidra-extract/ghidra_${GHIDRA_VERSION}_PUBLIC" /opt/ghidra; \
-    rmdir /opt/ghidra-extract; \
-    test -x /opt/ghidra/support/analyzeHeadless; \
-    test -x "/opt/ghidra/Ghidra/Features/Decompiler/os/linux_x86_64/decompile"; \
-    java -version 2>&1 | head -1; \
-    javac -version
+# JAVA_HOME is engine-independent: jadx, apktool and ilspycmd all need a JDK.
+# The Ghidra install itself lives in the engine section at the end of the file.
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 
 # =============================================================================
-# 5. Hopper Disassembler (Linux x64)
-#    Official public demo .deb -> /opt/hopper. A licensed .deb dropped in
-#    vendor/ supersedes it (see vendor/README.md). Hopper's headless Linux
-#    path is driven by REA on a private Xvfb display, demo mode included.
+# 5. Hopper Disassembler (Linux x64) - engine section at the end of the file
 # =============================================================================
-ENV HOPPER_LAUNCHER_PATH=/opt/hopper/bin/Hopper \
-    HOPPER_STATE_DIR=/home/rea/.local/share/hopper
 COPY vendor/ /opt/rea-vendor/
-RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
-    set -eux; \
-    cd /var/cache/rea-dl; \
-    deb="$(ls /opt/rea-vendor/*.deb 2>/dev/null | head -n1 || true)"; \
-    if [ -n "$deb" ]; then \
-      echo "Using vendor-supplied Hopper package: $deb"; \
-      cp "$deb" /tmp/hopper.deb; \
-    else \
-      url="${HOPPER_DEB_URL}"; \
-      if [ -z "$url" ]; then \
-        filename="$(grep -rhoE 'Hopper-[0-9]+\.[0-9]+\.[0-9]+-Linux-demo\.deb' \
-          "$(npm root -g)/rea-agents/dist" 2>/dev/null | head -n1 || true)"; \
-        [ -n "$filename" ] || filename="Hopper-6.4.2-Linux-demo.deb"; \
-        url="https://www.hopperapp.com:443/downloader/public/${filename}"; \
-        echo "REA pins this Linux Hopper demo package: ${filename}"; \
-      fi; \
-      echo "Downloading ${url}"; \
-      debname="$(basename "$url")"; \
-      [ -f "$debname" ] || curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" \
-        -H "Referer: https://www.hopperapp.com/download" -o "$debname" "$url"; \
-      if [ -n "${HOPPER_DEB_BYTES}" ]; then \
-        test "$(stat -c %s "$debname")" = "${HOPPER_DEB_BYTES}"; \
-      fi; \
-      if [ -n "${HOPPER_DEB_SHA1}" ]; then \
-        echo "${HOPPER_DEB_SHA1}  ${debname}" | sha1sum -c -; \
-      fi; \
-      cp "$debname" /tmp/hopper.deb; \
-    fi; \
-    apt-get update -qq; \
-    apt-get install -y --no-install-recommends /tmp/hopper.deb; \
-    rm -f /tmp/hopper.deb; \
-    apt-get install -y --no-install-recommends xvfb python3 x11-utils libxtst6; \
-    apt-get clean; rm -rf /var/lib/apt/lists/*; \
-    test -x "${HOPPER_LAUNCHER_PATH}"; \
-    ldd "${HOPPER_LAUNCHER_PATH}" | grep -c "not found" || true; \
-    echo "Hopper launcher sha256: $(sha256sum "${HOPPER_LAUNCHER_PATH}" | cut -d' ' -f1)"
 
 # =============================================================================
-# 6. Optional in-image IDA Pro / IDA Home / IDA Free
+# 6. Optional in-image IDA (Pro / Home / Free) - engine section at the end
 #    OFF BY DEFAULT: Hex-Rays does not permit redistribution of IDA, and a
 #    redistribution image (blacktop/docker-idapro) was taken down by DMCA in
 #    Jan 2026. Drop your own installer in vendor/ida/*.run to bake it in, or
 #    bind-mount an existing installation at runtime (recommended).
 # =============================================================================
-ENV IDADIR=/opt/ida
-RUN set -eux; \
-    run="$(ls /opt/rea-vendor/ida/*.run 2>/dev/null | head -n1 || true)"; \
-    if [ "${INSTALL_IDA}" = "0" ] || [ -z "$run" ]; then \
-      echo "IDA not baked into the image (bring-your-own via volume mount, or vendor/ida/*.run)"; \
-      mkdir -p /opt/ida; \
-    else \
-      echo "Installing vendor-supplied IDA: $run"; \
-      chmod +x "$run"; \
-      "$run" --mode unattended --prefix=/opt/ida --unattendedmodeui none; \
-      test -x /opt/ida/ida64 || test -x /opt/ida/ida; \
-      for lic in /opt/rea-vendor/ida/*.hexlic; do [ -e "$lic" ] && mkdir -p /home/rea/.idapro && cp "$lic" /home/rea/.idapro/; done; \
-      true; \
-    fi
 
 # =============================================================================
 # 7. WABT 1.0.42 (exact release REA admits) and JADX headless MCP 0.7.1
@@ -453,15 +396,29 @@ RUN set -eux; \
 # =============================================================================
 # 16. Non-root runtime user, auxiliary services and verification harness
 # =============================================================================
+# Ubuntu 24.04 ships uid/gid 1000 as a stock `ubuntu` user, so the runtime
+# identity is created tolerantly: reuse an existing group id, and rename a stock
+# user that already owns the requested uid (this is what makes the default
+# REA_UID/REA_GID work, not just the host-matched ones).
 RUN set -eux; \
-    groupadd --gid "${REA_GID}" "${REA_USER}"; \
-    useradd --uid "${REA_UID}" --gid "${REA_GID}" --create-home \
-      --home-dir "/home/${REA_USER}" --shell /bin/bash "${REA_USER}"; \
+    if ! getent group "${REA_GID}" >/dev/null; then \
+      groupadd --gid "${REA_GID}" "${REA_USER}"; \
+    fi; \
+    if getent passwd "${REA_UID}" >/dev/null; then \
+      stock="$(getent passwd "${REA_UID}" | cut -d: -f1)"; \
+      echo "uid ${REA_UID} is taken by the stock user '${stock}'; renaming it to '${REA_USER}'"; \
+      usermod --login "${REA_USER}" --home "/home/${REA_USER}" --move-home \
+        --shell /bin/bash --gid "${REA_GID}" "${stock}"; \
+    else \
+      useradd --uid "${REA_UID}" --gid "${REA_GID}" --create-home \
+        --home-dir "/home/${REA_USER}" --shell /bin/bash "${REA_USER}"; \
+    fi; \
+    id "${REA_USER}"; \
     mkdir -p /work /evidence /etc/rea /home/${REA_USER}/.idapro \
              /home/${REA_USER}/.local/share/hopper /home/${REA_USER}/.rea \
              /home/${REA_USER}/.dotnet /var/log/rea; \
     chown -R "${REA_UID}:${REA_GID}" /home/${REA_USER} /work /evidence /var/log/rea; \
-    chmod 0755 /opt/ghidra /opt/hopper /opt/wabt /opt/jadx 2>/dev/null || true
+    chmod 0755 /opt/wabt /opt/jadx 2>/dev/null || true
 
 # ilspycmd as a global tool in a fixed, home-independent location (so a
 # named/bind volume over /home/rea does not hide it)
@@ -470,6 +427,159 @@ RUN set -eux; \
     dotnet tool install --tool-path /opt/dotnet-tools ilspycmd --version ${ILSPYCMD_VERSION}; \
     test -x /opt/dotnet-tools/ilspycmd; \
     /opt/dotnet-tools/ilspycmd --version 2>&1 | head -3 || true
+
+# =============================================================================
+# 17. ENGINE LAYERS - kept at the end on purpose.
+#     Everything above is identical in all four engine images (REA_ENGINE=all,
+#     ghidra, hopper, ida), so those layers come from the cache for the second
+#     and later engine variant instead of being rebuilt. Only the layers below
+#     differ between rea-agent, rea-agent-ghidra, rea-agent-hopper and
+#     rea-agent-ida. `make build-all` builds them one after the other for this
+#     reason.
+# =============================================================================
+ENV REA_ENGINE=${REA_ENGINE}
+
+# --- 17a. Ghidra 12.1.x (REA_ENGINE=all|ghidra) -----------------------------
+# Multi-architecture engine: x86, x86-64, ARM/Thumb, AArch64, MIPS, PowerPC,
+# RISC-V, SuperH, 6502, Z80, 16-bit DOS, ... JDK 21 is installed above and is
+# present in every image (jadx, apktool and ilspycmd need it too).
+RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
+    set -eux; \
+    case "${REA_ENGINE}" in all|ghidra) : ;; *) echo "skipping Ghidra (REA_ENGINE=${REA_ENGINE})"; exit 0 ;; esac; \
+    cd /var/cache/rea-dl; \
+    [ -f "${GHIDRA_ZIP}" ] || curl -fsSLo "${GHIDRA_ZIP}" \
+      "${GHIDRA_BASE_URL}/Ghidra_${GHIDRA_VERSION}_build/${GHIDRA_ZIP}"; \
+    if [ -n "${GHIDRA_SHA256}" ]; then echo "${GHIDRA_SHA256}  ${GHIDRA_ZIP}" | sha256sum -c -; fi; \
+    sha256sum "${GHIDRA_ZIP}" | tee /tmp/ghidra-zip.sha256; \
+    mkdir -p /opt/ghidra-extract; \
+    unzip -q "${GHIDRA_ZIP}" -d /opt/ghidra-extract; \
+    mv "/opt/ghidra-extract/ghidra_${GHIDRA_VERSION}_PUBLIC" /opt/ghidra; \
+    rmdir /opt/ghidra-extract; \
+    test -x /opt/ghidra/support/analyzeHeadless; \
+    test -x "/opt/ghidra/Ghidra/Features/Decompiler/os/linux_x86_64/decompile"; \
+    chmod -R a+rX /opt/ghidra; \
+    java -version 2>&1 | head -1; \
+    javac -version
+
+# --- 17b. Hopper Disassembler (REA_ENGINE=all|hopper) ----------------------
+# Official public demo .deb -> /opt/hopper. A licensed .deb dropped in
+# vendor/ supersedes it (see vendor/README.md). Hopper's headless Linux path
+# is driven by REA on a private Xvfb display, demo mode included.
+RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
+    set -eux; \
+    case "${REA_ENGINE}" in all|hopper) : ;; *) echo "skipping Hopper (REA_ENGINE=${REA_ENGINE})"; exit 0 ;; esac; \
+    cd /var/cache/rea-dl; \
+    deb="$(ls /opt/rea-vendor/*.deb 2>/dev/null | head -n1 || true)"; \
+    if [ -n "$deb" ]; then \
+      echo "Using vendor-supplied Hopper package: $deb"; \
+      cp "$deb" /tmp/hopper.deb; \
+    else \
+      url="${HOPPER_DEB_URL}"; \
+      if [ -z "$url" ]; then \
+        filename="$(grep -rhoE 'Hopper-[0-9]+\.[0-9]+\.[0-9]+-Linux-demo\.deb' \
+          "$(npm root -g)/rea-agents/dist" 2>/dev/null | head -n1 || true)"; \
+        [ -n "$filename" ] || filename="Hopper-6.4.2-Linux-demo.deb"; \
+        url="https://www.hopperapp.com:443/downloader/public/${filename}"; \
+        echo "REA pins this Linux Hopper demo package: ${filename}"; \
+      fi; \
+      echo "Downloading ${url}"; \
+      debname="$(basename "$url")"; \
+      [ -f "$debname" ] || curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" \
+        -H "Referer: https://www.hopperapp.com/download" -o "$debname" "$url"; \
+      if [ -n "${HOPPER_DEB_BYTES}" ]; then \
+        test "$(stat -c %s "$debname")" = "${HOPPER_DEB_BYTES}"; \
+      fi; \
+      if [ -n "${HOPPER_DEB_SHA1}" ]; then \
+        echo "${HOPPER_DEB_SHA1}  ${debname}" | sha1sum -c -; \
+      fi; \
+      cp "$debname" /tmp/hopper.deb; \
+    fi; \
+    apt-get update -qq; \
+    apt-get install -y --no-install-recommends /tmp/hopper.deb; \
+    rm -f /tmp/hopper.deb; \
+    apt-get install -y --no-install-recommends xvfb python3 x11-utils libxtst6; \
+    apt-get clean; rm -rf /var/lib/apt/lists/*; \
+    test -x /opt/hopper/bin/Hopper; \
+    ldd /opt/hopper/bin/Hopper | grep -c "not found" || true; \
+    chmod -R a+rX /opt/hopper; \
+    echo "Hopper launcher sha256: $(sha256sum /opt/hopper/bin/Hopper | cut -d' ' -f1)"
+
+# --- 17c. Optional in-image IDA (REA_ENGINE=all|ida) ------------------------
+# OFF BY DEFAULT: Hex-Rays does not permit redistribution of IDA, and a
+# redistribution image (blacktop/docker-idapro) was taken down by DMCA in
+# Jan 2026. Drop your own installer in vendor/ida/*.run to bake it in, or
+# bind-mount an existing installation at runtime (recommended).
+# IDA Pro / IDA Home / IDA Free are the same program at different licence
+# tiers - see docs/ida-variants.md for which ones can drive REA headlessly.
+RUN set -eux; \
+    mkdir -p /opt/ida; \
+    case "${REA_ENGINE}" in all|ida) : ;; *) echo "skipping IDA (REA_ENGINE=${REA_ENGINE})"; exit 0 ;; esac; \
+    run="$(ls /opt/rea-vendor/ida/*.run 2>/dev/null | head -n1 || true)"; \
+    if [ "${INSTALL_IDA}" = "0" ] || [ -z "$run" ]; then \
+      echo "IDA not baked into the image (bring-your-own via volume mount, or vendor/ida/*.run)"; \
+    else \
+      echo "Installing vendor-supplied IDA: $run"; \
+      chmod +x "$run"; \
+      "$run" --mode unattended --prefix=/opt/ida --unattendedmodeui none; \
+      test -x /opt/ida/ida64 || test -x /opt/ida/ida; \
+      for lic in /opt/rea-vendor/ida/*.hexlic; do \
+        [ -e "$lic" ] || continue; \
+        mkdir -p /home/rea/.idapro; \
+        cp "$lic" /home/rea/.idapro/; \
+      done; \
+      chown -R "${REA_UID}:${REA_GID}" /home/rea/.idapro; \
+      true; \
+    fi
+
+# --- 17d. Engine configuration ---------------------------------------------
+# /etc/rea/engine          : plain marker the healthcheck, entrypoint and the
+#                            verification harness read (all|ghidra|hopper|ida)
+# /etc/rea/engine.env      : the engine paths THIS image needs, and a standing
+#                            REA_ANALYSIS_PROVIDER for the single-engine images
+# /usr/local/bin/rea       : wrapper that sources engine.env for every `rea`
+#                            invocation, so `docker exec -i <ctr> rea mcp` finds
+#                            the engine without any compose env. An image that
+#                            has no Ghidra does not advertise GHIDRA_INSTALL_DIR
+#                            at all - REA never sees a stale path.
+RUN set -eux; \
+    mkdir -p /etc/rea; \
+    echo "${REA_ENGINE}" > /etc/rea/engine; \
+    case "${REA_ENGINE}" in \
+      all|ghidra) printf '%s\n' \
+        "export GHIDRA_INSTALL_DIR=/opt/ghidra" \
+        "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64" >> /etc/rea/engine.env ;; \
+    esac; \
+    case "${REA_ENGINE}" in \
+      ghidra) printf '%s\n' "export REA_ANALYSIS_PROVIDER=ghidra" >> /etc/rea/engine.env ;; \
+    esac; \
+    case "${REA_ENGINE}" in \
+      all|hopper) printf '%s\n' \
+        "export HOPPER_LAUNCHER_PATH=/opt/hopper/bin/Hopper" \
+        "export HOPPER_STATE_DIR=/home/rea/.local/share/hopper" >> /etc/rea/engine.env ;; \
+    esac; \
+    case "${REA_ENGINE}" in \
+      hopper) printf '%s\n' "export REA_ANALYSIS_PROVIDER=hopper" >> /etc/rea/engine.env ;; \
+    esac; \
+    case "${REA_ENGINE}" in \
+      all|ida) printf '%s\n' "export IDADIR=/opt/ida" >> /etc/rea/engine.env ;; \
+    esac; \
+    cat /etc/rea/engine.env; \
+    mv /usr/local/bin/rea /usr/local/bin/rea-npm-shim; \
+    printf '%s\n' \
+      '#!/bin/sh' \
+      '# Inject this image'"'"'s engine configuration (see /etc/rea/engine.env).' \
+      '# Generated by the rea-agent image build - do not edit in a container.' \
+      'if [ -r /etc/rea/engine.env ]; then' \
+      '    set -a' \
+      '    . /etc/rea/engine.env' \
+      '    set +a' \
+      'fi' \
+      'exec /usr/local/bin/rea-npm-shim "$@"' \
+      > /usr/local/bin/rea; \
+    chmod 0755 /usr/local/bin/rea; \
+    rea --version; \
+    echo "engine profile: $(cat /etc/rea/engine)"; \
+    rea providers --json 2>/dev/null | head -20 || true
 
 # --- operational env ---------------------------------------------------------
 # TERM keeps PTY-oriented tooling (pwntools, mitmdump, chrome) quiet; REA uses

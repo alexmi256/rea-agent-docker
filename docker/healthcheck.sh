@@ -13,6 +13,25 @@ fail() { printf 'unhealthy: %s\n' "$*" >&2; exit 1; }
 command -v rea  >/dev/null 2>&1 || fail "rea is not on PATH"
 command -v node >/dev/null 2>&1 || fail "node is not on PATH"
 
+# The image declares which engine(s) it ships; only those are required here.
+engine="$(cat /etc/rea/engine 2>/dev/null || echo all)"
+case "$engine" in
+    all|ghidra)
+        [ -x "${GHIDRA_INSTALL_DIR:-/opt/ghidra}/support/analyzeHeadless" ] || fail "engine=$engine but Ghidra is missing at ${GHIDRA_INSTALL_DIR:-/opt/ghidra}"
+        command -v java >/dev/null 2>&1 || fail "engine=$engine but java is not on PATH"
+        ;;
+esac
+case "$engine" in
+    all|hopper)
+        [ -x "${HOPPER_LAUNCHER_PATH:-/opt/hopper/bin/Hopper}" ] || fail "engine=$engine but the Hopper launcher is missing"
+        ;;
+esac
+case "$engine" in
+    all|ida)
+        [ -d "${IDADIR:-/opt/ida}" ] || fail "engine=$engine but IDADIR=${IDADIR:-/opt/ida} does not exist"
+        ;;
+esac
+
 version="$(rea --version 2>/dev/null)" || fail "rea --version failed"
 [ -n "$version" ] || fail "rea --version produced no output"
 
@@ -31,7 +50,11 @@ command -v java >/dev/null 2>&1 || fail "java is not on PATH"
 rea providers --json >/dev/null 2>&1 || fail "rea providers failed"
 
 if [ "${REA_HEALTHCHECK_DEEP:-0}" = "1" ]; then
-    rea doctor --provider ghidra --json >/dev/null 2>&1 || fail "rea doctor --provider ghidra reported a problem"
+    case "$engine" in
+        all|ghidra) rea doctor --provider ghidra --json >/dev/null 2>&1 || fail "rea doctor --provider ghidra reported a problem" ;;
+        hopper)     rea doctor --provider hopper  --json >/dev/null 2>&1 || fail "rea doctor --provider hopper reported a problem" ;;
+        ida)        [ -n "${REA_IDA_MCP_CONFIG:-}" ] || fail "engine=ida but REA_IDA_MCP_CONFIG is not set" ;;
+    esac
 fi
 
-printf 'healthy: rea %s on node %s\n' "$version" "$(node --version)"
+printf 'healthy: rea %s on node %s (engine: %s)\n' "$version" "$(node --version)" "$engine"

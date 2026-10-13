@@ -7,8 +7,27 @@ container:
 
 | Path | How | When to use |
 | ---- | --- | ----------- |
-| stdio via `docker exec` | client spawns `docker exec -i rea-agent rea mcp` | Hermes and other local agents; simplest, no network surface |
+| stdio via `docker exec` | client spawns `docker exec -i <container> rea mcp` | Hermes and other local agents; simplest, no network surface |
 | Streamable HTTP | `compose.http.yml` adds a `supergateway` sidecar publishing `:8811` | other containers, remote agents, MCP Inspector, non-`docker exec` clients |
+
+## 0. Which container?
+
+There is one image per engine and one compose service per image, so the only
+thing that changes in everything below is the container name
+([docs/IMAGES.md](IMAGES.md)):
+
+| You started | Container | Engine | Provider for native work |
+| --- | --- | --- | --- |
+| `docker compose up -d` | `rea-agent` | Ghidra + Hopper | `--provider ghidra` / `--provider hopper` per call |
+| `... --profile ghidra up -d rea-ghidra` | `rea-agent-ghidra` | Ghidra | `ghidra` (already the image default) |
+| `... --profile hopper up -d rea-hopper` | `rea-agent-hopper` | Hopper | `hopper` (already the image default) |
+| `... --profile ida up -d rea-ida` | `rea-agent-ida` | none — your IDA | `ida`, once registered ([ida-variants.md](ida-variants.md)) |
+
+The single-engine images set `REA_ANALYSIS_PROVIDER` inside
+`/etc/rea/engine.env`, so the agent does not have to name an engine on every
+call. Override it with `REA_ANALYSIS_PROVIDER=…` in `config/rea.env` if the
+target needs a different one (an image with one engine simply reports the other
+as unavailable rather than guessing).
 
 ## 1. stdio (recommended for Hermes)
 
@@ -18,7 +37,7 @@ container:
 mcp_servers:
   rea:
     command: "docker"
-    args: ["exec", "-i", "rea-agent", "rea", "mcp"]
+    args: ["exec", "-i", "rea-agent-ghidra", "rea", "mcp"]   # or rea-agent / rea-agent-hopper / rea-agent-ida
     timeout: 1800          # Ghidra's first query imports + auto-analyses
     connect_timeout: 120
     sampling:
@@ -48,12 +67,21 @@ Give it targets it can read: put samples in `./targets` (mounted read-only at
 ## 2. Streamable HTTP bridge
 
 ```bash
-docker compose -f docker-compose.yml -f compose.http.yml up -d
+# with the engine you built (REA_IMAGE/REA_ENGINE must match that image)
+REA_IMAGE=rea-agent-ghidra:6.4.0-linux-amd64 REA_ENGINE=ghidra \
+  docker compose -f docker-compose.yml -f compose.http.yml --profile ghidra up -d rea-mcp-http
+# or: make http-up ENGINE=ghidra
+
 curl -sS -X POST http://127.0.0.1:8811/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
 ```
+
+The bridge sidecar is engine-agnostic: it runs `rea mcp` from whichever image you
+give it, and that image's `/etc/rea/engine.env` supplies the engine paths, so it
+carries any of the four engines (it no longer depends on a particular service
+being up).
 
 `supergateway` bridges `rea mcp` (stdio) to `streamableHttp` on port 8811. Bind
 address is `REA_MCP_HTTP_BIND` (default `127.0.0.1`, i.e. host loopback only).
@@ -121,12 +149,13 @@ docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/.agents/skills/revers
 ## 5. Verifying the wiring
 
 ```bash
-# Handshake + tool catalog + one engine-free tool call + one Ghidra call:
-docker compose exec rea-agent /opt/rea/verify/verify-all.sh --only mcp
+# Handshake + tool catalog + one engine-free tool call, for the engine you ran:
+docker compose exec rea-ghidra /opt/rea/verify/verify-all.sh --only mcp
+# (...and the native analysis step runs through that image's own engine)
 
 # Or by hand, the way Hermes does it:
 printf '%s\n%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"x","version":"1"}}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-| docker exec -i rea-agent rea mcp | head -2
+| docker exec -i rea-ghidra rea mcp | head -2
 ```

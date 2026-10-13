@@ -19,7 +19,6 @@ if rea --help 2>/dev/null | grep -qi frida; then
 else
     _skip "rea frida commands" "not part of the REA 6.4.0 release (present on main)"
 fi
-
 section "Android: adb + Apktool + JADX engine"
 check "adb client inspection" "adb|version" -- rea inspect-adb-client --json
 check "adb device listing (no device attached is a valid answer)" "." \
@@ -37,7 +36,11 @@ else
 fi
 check "ida registration templates present" "url|command" \
     -- bash -c "cat /opt/rea/assets/ida-mcp.official-http.json"
-check "IDADIR mount" "." -- bash -c "ls -ld \"${IDADIR:-/opt/ida}\""
+if engine_has ida; then
+    check "IDADIR mount" "." -- bash -c "ls -ld \"${IDADIR:-/opt/ida}\""
+else
+    _skip "IDADIR mount" "not in this image (engine: $(image_engine))"
+fi
 
 section "JEB provider (bring your own licence)"
 if [ -n "${REA_JEB_MCP_URL:-}" ]; then

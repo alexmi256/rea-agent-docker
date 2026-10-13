@@ -8,11 +8,16 @@ What this project does is make the bring-your-own step mechanical.
 
 | Engine            | Shipped in the image? | How you supply it                                     | Env / mount                                |
 | ----------------- | --------------------- | ----------------------------------------------------- | ------------------------------------------ |
-| Ghidra 12.1.x     | yes (Apache-2.0)      | built in, `/opt/ghidra`                               | `GHIDRA_INSTALL_DIR`, `JAVA_HOME`          |
-| Hopper            | yes, **public demo**  | replace `vendor/*.deb` with your licensed package     | `HOPPER_LAUNCHER_PATH`, `HOPPER_STATE_DIR` |
-| IDA Pro/Home/Free | **no**                | bind-mount your install (+ `ida.hexlic`)              | `IDADIR`, `~/.idapro/`, `REA_IDA_MCP_CONFIG` |
+| Ghidra 12.1.x     | yes (`REA_ENGINE=all\|ghidra`) | built in, `/opt/ghidra`                    | `GHIDRA_INSTALL_DIR`, `JAVA_HOME`          |
+| Hopper            | yes, **public demo** (`REA_ENGINE=all\|hopper`) | replace `vendor/*.deb` with your licensed package | `HOPPER_LAUNCHER_PATH`, `HOPPER_STATE_DIR` |
+| IDA Pro/Home/Free | **no** (never, in any image) | bind-mount your install (+ `ida.hexlic`)       | `IDADIR`, `~/.idapro/`, `REA_IDA_MCP_CONFIG` |
 | JEB               | **no**                | run JEB yourself, point REA at its MCP endpoint        | `REA_JEB_MCP_URL`                          |
 | Frida / adb tooling | yes (MIT/Apache)    | built in                                              | -                                          |
+
+Which engines each image carries, and why you would pick one:
+[docs/IMAGES.md](IMAGES.md). "IDA" is not a separate product from "IDA Pro" -
+same program, different licence tier; see [docs/ida-variants.md](ida-variants.md)
+for the edition table (idalib / IDAPython / local decompiler availability).
 
 Note on IDA: Hex-Rays enforces its redistribution terms. `blacktop/docker-idapro`
 was taken down by DMCA notice in January 2026, which is why this project never
@@ -47,12 +52,14 @@ The launcher digest is printed by the build log
 
 ```bash
 # default (public demo 6.4.2 - the build REA 6.4.0 pins) - what compose does
-docker compose build rea-agent
+make build            # the all-engines image
+make build-hopper     # the Hopper-only image
 
 # licensed package: drop the DEB into vendor/ and rebuild
 cp ~/Downloads/Hopper-6.4.2-Linux.deb vendor/
-docker compose build --build-arg HOPPER_DEB_URL= rea-agent
-docker compose exec rea-agent rea doctor --provider hopper --json
+scripts/build.sh --engine hopper        # or ENGINE=all / make build
+docker compose --profile hopper up -d rea-hopper
+docker compose exec rea-hopper rea doctor --provider hopper --json
 ```
 
 Hopper stores its state (including activation) under its GNUstep application
@@ -74,6 +81,10 @@ Two supported arrangements.
 
 ### A. IDA inside this container (recommended)
 
+Use the engine-less `rea-ida` service - it exists for exactly this, and its image
+carries no other engine to confuse the provider choice. (The `rea-agent` service
+works too, via the same overlay: `-f compose.ida.yml up -d rea-agent`.)
+
 ```bash
 # 1. point at an existing installation - do not bake IDA into a pushed image
 grep -q IDA_INSTALL_DIR .env || cat >>.env <<'EOF'
@@ -83,20 +94,22 @@ EOF
 # 2. supply the licence file (never committed: .gitignore excludes *.hexlic)
 mkdir -p config/ida && cp ~/ida.hexlic config/ida/
 
-# 3. restart
-docker compose -f docker-compose.yml -f compose.ida.yml up -d
-docker compose exec rea-agent ls -l /opt/ida | head
-docker compose exec rea-agent ls -l ~/.idapro       # the licence lands here
+# 3. build and start the IDA image with the IDA overlay
+make build-ida
+docker compose -f docker-compose.yml -f compose.ida.yml --profile ida up -d rea-ida
+docker compose exec rea-ida ls -l /opt/ida | head
+docker compose exec rea-ida ls -l ~/.idapro       # the licence lands here
 
 # 4. install an MCP server for IDA and register it with REA
-docker compose exec rea-agent /opt/rea/scripts/setup-ida-mcp.sh idalib
-docker compose exec rea-agent rea doctor --provider ida --json
+docker compose exec rea-ida /opt/rea/scripts/setup-ida-mcp.sh idalib
+docker compose exec rea-ida rea doctor --provider ida --json
 ```
 
-`setup-ida-mcp.sh` modes: `idalib` (headless supervisor; IDA Pro/Home only,
-the shape REA's adapter was verified against), `official` (Hex-Rays' own
-`ida-mcp`, IDA 9.4+), `official-http`, `attached` (GUI already open with
-`ida-pro-mcp` 1.4.0), `native` (IDA Free via `ida-free-mcp`), `sidecar`.
+`setup-ida-mcp.sh` modes: `idalib` (headless supervisor; IDA Pro/Home/Classroom -
+**not IDA Free**, which has no idalib; the shape REA's adapter was verified
+against), `official` (Hex-Rays' own `ida-mcp`, IDA 9.4+), `official-http`,
+`attached` (GUI already open with `ida-pro-mcp` 1.4.0), `native` (IDA Free via the
+`ida-free-mcp` plugin), `sidecar`.
 
 Licence placement, per Hex-Rays docs: `ida.hexlic` goes into the IDA install
 directory **or** `$HOME/.idapro` (Windows: `%APPDATA%/Hex-Rays/IDA Pro`). The
@@ -120,7 +133,9 @@ REA_IDA_MCP_CONFIG=/etc/rea/ida-mcp.json
 `compose.ida.yml` adds a `ida-mcp` service (profile `ida-sidecar`) that you
 point at your own image with `IDA_MCP_IMAGE=...`; `ida/README.md` has a
 starting Dockerfile. Note IDA Free has no `idalib`, so headless profiles need
-IDA Pro or IDA Home; IDA Free only works in the attached GUI profiles.
+IDA Pro, IDA Home or IDA Classroom; IDA Free only works in the attached GUI
+profiles (and its decompiler is Hex-Rays' cloud service). The edition-by-edition
+breakdown is in [docs/ida-variants.md](ida-variants.md).
 
 ## JEB
 

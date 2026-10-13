@@ -1,8 +1,13 @@
 name: build-and-verify
 
-# Builds the amd64 image and runs the in-image verification harness. The full
-# harness (Ghidra multi-arch + Hopper + MCP) needs several GB of disk and a
-# long timeout; the quick profile is what runs on every push by default.
+# Builds the amd64 engine image(s) and runs the in-image verification harness.
+# The harness is engine-aware, so the same script verifies every image; per push
+# only the Ghidra image is built (fast, and the one most people use), while the
+# full four-engine matrix is available on demand via workflow_dispatch.
+#
+# Layer sharing note: each job is a fresh runner, so the matrix pays the shared
+# layers four times. That is why the matrix is opt-in; locally `make build-all`
+# shares them through the build cache.
 on:
   push:
     branches: [main]
@@ -10,14 +15,32 @@ on:
   workflow_dispatch:
     inputs:
       full:
-        description: "Run the full harness (Ghidra multi-arch + Hopper analysis)"
+        description: "Run the full harness (Ghidra multi-arch + Hopper analysis) and build all four engines"
         type: boolean
         default: false
 
 jobs:
-  build:
+  setup:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    outputs:
+      engines: ${{ steps.pick.outputs.engines }}
+    steps:
+      - id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.full }}" = "true" ]; then
+            echo 'engines=["all","ghidra","hopper","ida"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'engines=["ghidra"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: setup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: ${{ fromJSON(needs.setup.outputs.engines) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,15 +49,23 @@ jobs:
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
           df -h /
 
-      - name: Build rea-agent (linux/amd64)
+      - name: Build rea-agent (linux/amd64, engine=${{ matrix.engine }})
         run: |
           docker build --platform linux/amd64 \
-            --tag rea-agent:ci \
-            --build-arg REA_VERSION=6.4.0 \
+            --tag "rea-agent-${{ matrix.engine }}:ci" \
+            --build-arg REA_ENGINE=${{ matrix.engine }} \
             .
 
       - name: Image size
-        run: docker image inspect rea-agent:ci --format '{{.Size}} bytes'
+        run: |
+          docker image inspect "rea-agent-${{ matrix.engine }}:ci" --format '{{.Size}} bytes'
+          docker image inspect "rea-agent-${{ matrix.engine }}:ci" \
+            --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^REA_ENGINE='
+
+      - name: Engine profile as the container sees it
+        run: |
+          docker run --rm "rea-agent-${{ matrix.engine }}:ci" \
+            bash -c 'echo "engine: $(cat /etc/rea/engine)"; cat /etc/rea/engine.env; rea --version'
 
       - name: Quick verification (tools + static analysis + MCP handshake)
         run: |
@@ -42,42 +73,36 @@ jobs:
           docker run --rm --shm-size=1g \
             --user "$(id -u):$(id -g)" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
-            rea-agent:ci /opt/rea/verify/verify-all.sh --quick
+            "rea-agent-${{ matrix.engine }}:ci" /opt/rea/verify/verify-all.sh --quick
 
-      - name: Publish verification summary
-        if: always()
-        run: |
-          latest="$(ls -td work/verify-reports/*/ 2>/dev/null | head -1 || true)"
-          if [ -n "$latest" ] && [ -f "${latest}summary.txt" ]; then
-            {
-              echo "## rea-agent verification"
-              echo
-              echo '```'
-              cat "${latest}summary.txt"
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No verification summary was produced." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Full verification (Ghidra multi-arch + Hopper + HTTP bridge)
+      - name: Full verification (engine analysis + HTTP bridge)
         if: github.event_name == 'workflow_dispatch' && inputs.full
         run: |
           docker run --rm --shm-size=4g \
             --user "$(id -u):$(id -g)" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
-            rea-agent:ci /opt/rea/verify/verify-all.sh
+            "rea-agent-${{ matrix.engine }}:ci" /opt/rea/verify/verify-all.sh
+
+      - name: Publish verification summary
+        if: always()
+        run: |
+          latest="$(ls -td work/verify-reports/*/ 2>/dev/null | head -1 || true)"
+          {
+            echo "## rea-agent verification — engine \`${{ matrix.engine }}\`"
+            echo
+            if [ -n "$latest" ] && [ -f "${latest}summary.txt" ]; then
+              echo '```'
+              cat "${latest}summary.txt"
+              echo '```'
+            else
+              echo "No verification summary was produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload verification report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: verification-report
+          name: verification-report-${{ matrix.engine }}
           path: work/verify-reports
           if-no-files-found: ignore
-
-      - name: Harness log
-        if: always()
-        run: |
-          latest="$(ls -td work/verify-reports/*/ 2>/dev/null | head -1 || true)"
-          [ -n "$latest" ] && tail -60 "${latest}summary.txt" || true

@@ -12,14 +12,19 @@ TARGET="${REA_VERIFY_TARGET:-$FIX/fixture-x86_64.elf}"
 TIMEOUT_SECONDS="${REA_VERIFY_TIMEOUT:-900}"
 
 section "provider readiness"
-check_json "doctor: ghidra" '.healthy == true' -- rea doctor --provider ghidra --json
-if [ -x "${HOPPER_LAUNCHER_PATH:-/nonexistent}" ]; then
+if engine_has ghidra; then
+    check_json "doctor: ghidra" '.healthy == true' -- rea doctor --provider ghidra --json
+else
+    _skip "doctor: ghidra" "not in this image (engine: $(image_engine))"
+fi
+if engine_has hopper && [ -x "${HOPPER_LAUNCHER_PATH:-/nonexistent}" ]; then
     check_json "doctor: hopper" '.healthy == true' -- rea doctor --provider hopper --json
 else
-    _skip "doctor: hopper" "no Hopper launcher"
+    _skip "doctor: hopper" "Hopper not in this image (engine: $(image_engine))"
 fi
 
 section "ghidra: architecture coverage (multi-arch is the point)"
+if engine_has ghidra; then
 # x86-64 gets the full overview; every other architecture proves its import
 # language works by finding the fixture's own string literal through the
 # analysis session.
@@ -67,9 +72,12 @@ check "ghidra decompile mips32 main" "reverse-me|checksum|printf|strlen" \
     -- timeout "$TIMEOUT_SECONDS" rea decompile "$FIX/fixture-mips.elf" main --provider ghidra --json
 check "ghidra instructions of main" "." \
     -- timeout "$TIMEOUT_SECONDS" rea instructions "$TARGET" main --provider ghidra --json
+else
+    _skip "ghidra analysis" "not in this image (engine: $(image_engine))"
+fi
 
 section "hopper: headless demo analysis"
-if [ -x "${HOPPER_LAUNCHER_PATH:-/nonexistent}" ]; then
+if engine_has hopper && [ -x "${HOPPER_LAUNCHER_PATH:-/nonexistent}" ]; then
     HOPPER_TIMEOUT_SECONDS="${REA_VERIFY_HOPPER_TIMEOUT:-600}"
     if command -v timeout >/dev/null 2>&1; then
         check_json "hopper analyze x86_64" '.evidence_id != null' \
@@ -82,8 +90,10 @@ if [ -x "${HOPPER_LAUNCHER_PATH:-/nonexistent}" ]; then
         check_json "hopper analyze x86_64" '.evidence_id != null' \
             -- rea analyze "$FIX/fixture-x86_64.elf" --provider hopper --json
     fi
+elif [ "$(image_engine)" = "ida" ]; then
+    _skip "hopper analysis" "IDA image: register IDA (see docs/ida-variants.md) to analyse natively"
 else
-    _skip "hopper analysis" "no Hopper launcher (bring your own licence)"
+    _skip "hopper analysis" "Hopper not in this image (engine: $(image_engine))"
 fi
 
 section "provider capabilities"
