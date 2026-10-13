@@ -18,7 +18,7 @@ check "java runtime"        "openjdk|java"             -- bash -c "java -version
 check "javac present"       "."                        -- bash -c "javac -version 2>&1"
 check "hopper launcher executable" "Hopper"            -- bash -c "ls -l \"$HOPPER_LAUNCHER_PATH\""
 check "hopper shared libraries resolve (0 = none missing)" "^0$" \
-    -- bash -c "ldd \"$HOPPER_LAUNCHER_PATH\" | grep -c 'not found'"
+    -- bash -c "ldd \"$HOPPER_LAUNCHER_PATH\" | grep -c 'not found' || true"
 check "hopper launcher digest is one REA accepts" "0294ced1|1339f9e5" \
     -- bash -c "sha256sum \"$HOPPER_LAUNCHER_PATH\""
 check "xvfb present"        "/usr/bin/Xvfb"            -- which Xvfb

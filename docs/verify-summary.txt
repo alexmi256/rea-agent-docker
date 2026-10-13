@@ -1,0 +1,55 @@
+rea-agent verification summary (partial run, captured mid-flight)
+run: work/verify-reports/20261013T171348Z/
+date: 2026-10-13T17:21:05Z
+
+== machine-checked facts ==
+- rea doctor --provider ghidra --json        -> healthy: true (Ghidra 12.1.4, native decompiler elf x86_64, JDK 21 64-bit)
+- rea doctor --provider hopper --json        -> healthy: true (hopper-version + hopper-demo-runtime healthy)
+- Hopper launcher sha256                     -> 0294ced141cc373468ee22d8343e7dac41980cb05a937994ca81c9f09afe7ded (in REA's supported set)
+- rea mcp initialize                         -> server rea 6.4.0, protocol 2025-06-18, tools/completions/prompts
+- rea mcp tools/list                         -> 170 tools
+- Ghidra analysis (this run)                 -> linux-x86_64 ok; aarch64/armv7/mips32-be/pe32+ search ok; riscv64+powerpc refused: unsupported ELF architecture
+- Hopper analysis (this run)                 -> analyze + decompile + string search returned Evidence (demo mode, private Xvfb)
+- ilspycmd 8.2.0.7535                        -> runs (DOTNET_ROLL_FORWARD=Major)
+- frida binding                              -> getLocalDevice() = Local System
+
+== last complete run (20261013T170107Z) ==
+rea-agent verification
+run:       20261013T170107Z
+date:      2026-10-13T17:12:02Z
+image:     unknown
+platform:  Linux 6.14.11-9-bpo12-pve x86_64
+node:      v24.21.0
+rea:       6.4.0
+passed:    71
+failed:    10
+skipped:   15
+
+failed checks:
+  - hopper shared libraries resolve (0 = none missing)
+  - ghidra analyze linux-x86_64
+  - ghidra search linux-riscv64 finds fixture string
+  - ghidra search linux-powerpc finds fixture string
+  - ghidra instructions at entry
+  - hopper analyze x86_64
+  - browser page capture (DOM/scripts)
+  - browser screenshot capture
+  - playwright launch + click + DOM capture
+  - mcp initialize/tools handshake
+
+skipped checks:
+  - inspect-artifact on an application directory
+  - inspect-artifact on an archive-like file
+  - plist decode
+  - managed artifact
+  - sqlite schema + row sample
+  - wasm artifact: imports/exports and WAT
+  - go-binary metadata probe
+  - pcap client inspection
+  - pcap capture: udp fields
+  - pcap summary
+  - sigrok decoder inventory
+  - vcd UART decode
+  - rea frida commands
+  - ida doctor
+  - jeb client

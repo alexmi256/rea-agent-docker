@@ -23,16 +23,16 @@ fi
 
 section "artifact inspection"
 if [ -d "$FIX/jsapp" ]; then
-    check_rea "inspect-artifact on an application directory" "package.json|src|jsapp|artifact" \
+    check_rea "inspect-artifact on an application directory" inspect-artifact "package.json|src|jsapp|artifact" \
         -- "$FIX/jsapp" --json
 fi
 if [ -s "$FIX/session.har" ]; then
-    check_rea "inspect-artifact on an archive-like file" "." -- "$FIX/session.har" --json
+    check_rea "inspect-artifact on an archive-like file" inspect-artifact "." -- "$FIX/session.har" --json
 fi
 
 section "Apple static formats"
 if [ -s "$FIX/Info.plist" ]; then
-    check_rea "plist decode" "CFBundleIdentifier|tools.rea.verify" -- "$FIX/Info.plist" --json
+    check_rea "plist decode" inspect-plist "CFBundleIdentifier|tools.rea.verify" -- "$FIX/Info.plist" --json
 else
     _skip "plist" "fixture missing"
 fi

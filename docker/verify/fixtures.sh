@@ -279,10 +279,11 @@ cat >"$FIX/process-scenario.json" <<'EOF'
   "timeout_ms": 15000
 }
 EOF
-cat >"$FIX/browser-scenario.json" <<'EOF'
+PW_CHROME="$(ls -d /opt/ms-playwright/chromium-*/chrome-linux/chrome 2>/dev/null | head -1)"
+cat >"$FIX/browser-scenario.json" <<EOF
 {
-  "browser": { "mode": "launch" },
-  "start_url": { "url": "file:///tmp/rea-verify/fixtures/www/index.html" },
+  "browser": { "mode": "launch", "executable_path": "${PW_CHROME:-/usr/bin/google-chrome}" },
+  "start_url": { "url": "http://127.0.0.1:8099/index.html" },
   "actions": [
     { "step_id": "settle", "action": "wait_for_timeout", "duration_ms": 200 },
     { "step_id": "click", "action": "click", "locator": { "kind": "css", "selector": "#go" }, "timeout_ms": 10000 },

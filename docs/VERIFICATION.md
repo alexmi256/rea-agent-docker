@@ -31,8 +31,56 @@ check is kept under `work/verify-reports/<run-id>/logs/`.
 * any fixture whose toolchain is missing (`--build-arg INSTALL_CROSS_TOOLCHAINS=0`
   or `INSTALL_CHROME=0`).
 
-## Recorded run
+## Two different catalogs: the release vs. `main`
 
-See `work/verify-reports/` after running the harness; a copy of the most recent
-`summary.txt` for the image built in this repository is checked in at
+REA's repository `main` documents more families than the published npm package.
+Checks use `check_rea`, which SKIPs (never fails) a family the *installed*
+release does not expose. For **REA 6.4.0** the released CLI/MCP **lacks**:
+
+`inspect-sqlite-database`, `inspect-wasm-artifact`, `inspect-go-binary`,
+`inspect-pcap-client`, `inspect-pcap-capture`, `inspect-packet-capture`,
+`inspect-signal-decoders`, `decode-signal-recording`, `list-frida-devices`
+(the frida family is on `main`; the frida *binding* is installed and verified).
+
+Their tooling (WABT, SQLite, TShark, sigrok-cli, frida) is nonetheless present
+and exercised directly, so a later `REA_VERSION` build arg immediately gains
+those checks.
+
+## Target-admission limits observed on REA 6.4.0
+
+* **RISC-V64 and PowerPC ELF** fixtures are refused with
+  `target_unavailable: unsupported ELF architecture` — the release's artifact
+  admission does not accept those `e_machine` values. Ghidra itself is fine:
+  x86-64, AArch64, ARMv7, MIPS32 BE/LE and PE32+ all import, analyse, search
+  and decompile. The harness reports these as SKIP-with-reason, not failure.
+* **Browser views must be HTTP(S) origin pages** — `file://` is refused
+  (`target_not_allowed`), so the fixture page is served on
+  `http://127.0.0.1:8099` for the CDP and Playwright checks.
+* **Playwright scenarios require `browser.executable_path`** plus an HTTP(S)
+  URL; the fixture points at the bundled Playwright Chromium.
+
+## Recorded runs
+
+| Run | Result |
+| --- | ------ |
+| `20261013T165832Z` (quick) | 47 passed / 8 failed / 6 skipped — produced the diagnosis below |
+| `20261013T170107Z` (first full) | 47+ passed; every failure was a harness/fixture defect since fixed: missing `check_rea` command argument, `grep -c` exit status, `binary_overview` string assertions, `file://` browser targets, missing Playwright `executable_path`, and the MCP probe choosing a tool that errors on a directory |
+| `20261013T171348Z` (after the fixes) | Ghidra x86-64 analysis, AArch64/ARMv7/MIPS32/PE32+ search and the Hopper trio verified clean; see `work/verify-reports/<run>/summary.txt` |
+
+Machine-checked facts that hold independently of the harness:
+
+* `rea doctor --provider ghidra --json` → `healthy: true`, with
+  `ghidra-native_decompiler` reporting "elf x86_64, which matches linux/x64"
+  and `ghidra-java` accepting JDK 21.0.12.1 64-bit.
+* `rea doctor --provider hopper --json` → `healthy: true`; `hopper-version`
+  healthy (launcher SHA-256 `0294ced1…` is in REA's `SUPPORTED_HOPPER_SHA256`)
+  and `hopper-demo-runtime` healthy with `strategy=direct`.
+* `rea mcp` answers MCP `initialize` (server `rea 6.4.0`, protocol
+  `2025-06-18`, capabilities tools/completions/prompts) and advertises
+  **170 tools**.
+* `ilspycmd 8.2.0.7535` runs (it is a net6.0 app; the image sets
+  `DOTNET_ROLL_FORWARD=Major`).
+* frida binding: `getLocalDevice()` → "Local System".
+
+The committed summary of a full run is in
 [`docs/verify-summary.txt`](verify-summary.txt).

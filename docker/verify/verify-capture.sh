@@ -54,11 +54,16 @@ else
 fi
 
 section "browser: CDP observation"
+# REA refuses file:// targets - views must be HTTP(S) pages in the origin scope -
+# so the fixture page is served locally for the browser sections.
+python3 -m http.server 8099 --directory "$FIX/www" >"$WORK/fixture-server.log" 2>&1 &
+FIXTURE_PID=$!
+sleep 1
 BROWSER_BIN="$(command -v google-chrome || command -v chromium || true)"
 if [ -n "$BROWSER_BIN" ] && [ -s "$FIX/www/index.html" ]; then
     "$BROWSER_BIN" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
         --user-data-dir="$WORK/chrome-profile" --remote-debugging-port=9222 \
-        "file://$FIX/www/index.html" >"$WORK/chrome.log" 2>&1 &
+        "http://127.0.0.1:8099/index.html" >"$WORK/chrome.log" 2>&1 &
     echo $! >"$WORK/chrome.pid"
     for _ in $(seq 1 20); do
         curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && break
@@ -87,6 +92,7 @@ if [ -s "$FIX/browser-scenario.json" ] && [ -d /opt/ms-playwright ]; then
 else
     _skip "playwright scenario" "playwright browsers or fixture missing"
 fi
+kill "$FIXTURE_PID" 2>/dev/null || true
 
 section "process behaviour capture (native PTY)"
 if [ -s "$FIX/process-scenario.json" ]; then

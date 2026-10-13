@@ -14,6 +14,7 @@ const serverCmd = process.env.REA_MCP_SERVER ?? "rea";
 const serverArgs = (process.env.REA_MCP_ARGS ?? "mcp").split(" ").filter(Boolean);
 const sqlitePath = process.env.REA_VERIFY_SQLITE ?? "/tmp/rea-verify/fixtures/fixture.sqlite";
 const jsappDir = process.env.REA_VERIFY_JSAPP ?? "/tmp/rea-verify/fixtures/jsapp";
+const managedPath = process.env.REA_VERIFY_MANAGED ?? "/tmp/rea-verify/fixtures/dotnet-app/bin/Release/net8.0/VerifyLib.dll";
 const binaryPath = process.env.REA_VERIFY_BINARY ?? "/tmp/rea-verify/fixtures/fixture-x86_64.elf";
 const provider = process.env.REA_VERIFY_PROVIDER ?? "ghidra";
 const doAnalysis = (process.env.REA_VERIFY_MCP_ANALYSIS ?? "1") === "1";
@@ -92,9 +93,9 @@ try {
 
     if (existsSync(sqlitePath)) {
         const candidates = [
-            { tool: "inspect_artifact", path: jsappDir, args: { path: jsappDir }, expect: /package\.json|src|jsapp|artifact/i },
-            { tool: "inspect_sqlite_database", path: sqlitePath, args: { path: sqlitePath, table: "settings", row_limit: 5 }, expect: /settings|license_requests/ },
             { tool: "inspect_binary_layout", path: binaryPath, args: { path: binaryPath }, expect: /main|section|segment/i },
+            { tool: "inspect_sqlite_database", path: sqlitePath, args: { path: sqlitePath, table: "settings", row_limit: 5 }, expect: /settings|license_requests/ },
+            { tool: "inspect_managed_artifact", path: managedPath, args: { path: managedPath }, expect: /VerifyLib|managed|ILOnly/i },
         ];
         const chosen = candidates.find((c) => names.includes(c.tool) && existsSync(c.path));
         if (!chosen) {
@@ -110,6 +111,7 @@ try {
             if (call?.isError || !chosen.expect.test(text)) {
                 throw new Error(`tools/call ${chosen.tool} did not return usable data`);
             }
+            summary.ok = true;
         }
     } else {
         summary.steps["tools/call:engine-free"] = { skipped: "fixture missing" };
