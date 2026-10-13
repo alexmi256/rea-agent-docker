@@ -1,0 +1,74 @@
+# =============================================================================
+#  Optional overlay: publish REA's MCP surface over Streamable HTTP.
+#
+#    docker compose -f docker-compose.yml -f compose.http.yml up -d
+#
+#  Useful when the MCP client does not run `docker exec` itself (other
+#  containers, remote agents, a browser-based client, mcp-inspector, ...).
+#  The endpoint is http://<bind>:<port>/mcp with the default Docker publish
+#  below reachable on the Docker host.
+#
+#  Note: with Docker-in-Docker Hermes setups, 127.0.0.1 inside the Hermes
+#  container is NOT the Docker host - use the stdio path (docker exec) or
+#  point the client at the host gateway address instead.
+# =============================================================================
+name: rea-agent
+
+services:
+  rea-mcp-http:
+    image: ${REA_IMAGE:-rea-agent:6.4.0-linux-amd64}
+    container_name: ${REA_CONTAINER_NAME:-rea-agent}-http
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    user: "${REA_UID:-1000}:${REA_GID:-1000}"
+    working_dir: /work
+    shm_size: ${REA_SHM_SIZE:-1gb}
+    depends_on:
+      rea-agent:
+        condition: service_started
+    ports:
+      - "${REA_MCP_HTTP_BIND:-127.0.0.1}:${REA_MCP_HTTP_PORT:-8811}:8811"
+    environment:
+      REA_ANALYSIS_PROVIDER: ${REA_ANALYSIS_PROVIDER:-}
+      REA_MCP_INPUT_SCHEMA_PROFILE: ${REA_MCP_INPUT_SCHEMA_PROFILE:-compact}
+      REA_MCP_MAX_RESPONSE_BYTES: ${REA_MCP_MAX_RESPONSE_BYTES:-}
+      REA_GHIDRA_STARTUP_TIMEOUT_MS: ${REA_GHIDRA_STARTUP_TIMEOUT_MS:-900000}
+      REA_HOPPER_STARTUP_TIMEOUT_MS: ${REA_HOPPER_STARTUP_TIMEOUT_MS:-300000}
+      GHIDRA_HEADLESS_MAXMEM: ${GHIDRA_HEADLESS_MAXMEM:-4G}
+      IDADIR: ${IDADIR:-/opt/ida}
+      REA_IDA_MCP_CONFIG: ${REA_IDA_MCP_CONFIG:-}
+      REA_IDA_MCP_FORWARD: ${REA_IDA_MCP_FORWARD:-}
+      REA_JEB_MCP_URL: ${REA_JEB_MCP_URL:-}
+      REA_JEB_MCP_FORWARD: ${REA_JEB_MCP_FORWARD:-}
+      REA_ENTRYPOINT_DOCTOR: "0"
+      TMPDIR: /tmp/rea
+    volumes:
+      - ./work:/work
+      - ${REA_TARGETS_DIR:-./targets}:/targets:ro
+      - ./config:/etc/rea:ro
+      - rea-home-http:/home/rea
+      - ${IDA_INSTALL_DIR:-./vendor/ida}:/opt/ida:ro
+      - ${HOPPER_STATE_VOLUME:-./vendor/hopper-state}:/home/rea/.local/share/hopper
+    # supergateway bridges stdio (REA's only transport) to Streamable HTTP.
+    command:
+      - supergateway
+      - --stdio
+      - rea mcp
+      - --outputTransport
+      - streamableHttp
+      - --port
+      - "8811"
+      - --host
+      - 0.0.0.0
+      - --stateful
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8811/mcp || exit 1"]
+      interval: 60s
+      timeout: 20s
+      start_period: 90s
+      retries: 3
+
+volumes:
+  rea-home-http:
+    name: ${REA_HOME_VOLUME:-rea-agent-home}-http

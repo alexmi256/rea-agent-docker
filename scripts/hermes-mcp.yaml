@@ -1,0 +1,84 @@
+# Wiring rea-agent's MCP surface into Hermes Agent
+#
+# Add the block below to ~/.hermes/config.yaml and restart Hermes
+# (`hermes restart`, or exit and relaunch). Tools appear as mcp_rea_<tool>,
+# e.g. mcp_rea_open_binary, mcp_rea_analyze_function.
+#
+# Prerequisite: the container is up.
+#   cd <this project> && docker compose up -d rea-agent
+#
+# Verify from a shell first:
+#   docker exec -i rea-agent rea mcp </dev/null   # exits cleanly, prints nothing
+
+mcp_servers:
+  # --- primary: stdio through `docker exec` into the long-lived service ------
+  # No networking required, no HTTP surface, no extra port: Hermes spawns
+  # `docker exec -i rea-agent rea mcp` and speaks MCP over its stdin/stdout.
+  rea:
+    command: "docker"
+    args: ["exec", "-i", "rea-agent", "rea", "mcp"]
+    # Ghidra's first query on a large target imports + auto-analyses it. REA's
+    # own provider deadline is REA_GHIDRA_STARTUP_TIMEOUT_MS (900 s in
+    # docker-compose.yml), so the client timeout must be at least as long.
+    timeout: 1800
+    connect_timeout: 120
+    env:
+      # Only needed if you want the container to pick a standing provider:
+      # REA_ANALYSIS_PROVIDER: "ghidra"
+      #
+      # REA advertises ~170 tools. `compact` (the image default) trims the
+      # per-request schema payload from ~496 KB to ~290 KB. Set "full" if a
+      # client-side feature needs the full nested schemas.
+      REA_MCP_INPUT_SCHEMA_PROFILE: "compact"
+    sampling:
+      # REA never asks the client to sample; disable to avoid the round trip.
+      enabled: false
+
+# --- optional second registration: ephemeral container per session -----------
+# Useful when you do not want a long-lived service (cold Ghidra/Hopper caches
+# each session, ~2-3 s extra, but nothing keeps running between tasks).
+# Uncomment and drop the `rea` entry above if you prefer this shape.
+#
+#  rea-ephemeral:
+#    command: "docker"
+#    args:
+#      - run
+#      - --rm
+#      - -i
+#      - --platform
+#      - linux/amd64
+#      - --shm-size=1g
+#      - -v
+#      - /flashcache/hermes/rea/work:/work
+#      - -v
+#      - /flashcache/hermes/rea/targets:/targets:ro
+#      - -w
+#      - /work
+#      - rea-agent:6.4.0-linux-amd64
+#      - rea
+#      - mcp
+#    timeout: 1800
+#    connect_timeout: 120
+
+# --- optional third registration: Streamable HTTP bridge ---------------------
+# Start it with:  docker compose -f docker-compose.yml -f compose.http.yml up -d
+# Then point Hermes at the published address. NOTE: when Hermes itself runs in
+# a container, 127.0.0.1 is Hermes' own loopback, not the Docker host - use the
+# host gateway/DNS name that reaches the published port.
+#
+#  rea-http:
+#    url: "http://host.docker.internal:8811/mcp"
+#    timeout: 1800
+#    connect_timeout: 120
+
+# --- optional: skip REA's bundled skill prompt shim --------------------------
+# REA also ships agent instructions (`npx rea-agents setup --client hermes`).
+# This image does not run setup for you: it would write into Hermes' own config
+# inside a different container. Install the skill from the Hermes side instead:
+#
+#   npx skills add morluto/rea --skill reverse-engineer-anything
+#
+# or copy the workflow out of the container:
+#
+#   docker cp rea-agent:/usr/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+#     ~/.hermes/skills/

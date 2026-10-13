@@ -1,0 +1,59 @@
+name: build-and-verify
+
+# Builds the amd64 image and runs the in-image verification harness. The full
+# harness (Ghidra multi-arch + Hopper + MCP) needs several GB of disk and a
+# long timeout; the quick profile is what runs on every push by default.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Run the full harness (Ghidra multi-arch + Hopper analysis)"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          df -h /
+
+      - name: Build rea-agent (linux/amd64)
+        run: |
+          docker build --platform linux/amd64 \
+            --tag rea-agent:ci \
+            --build-arg REA_VERSION=6.4.0 \
+            .
+
+      - name: Image size
+        run: docker image inspect rea-agent:ci --format '{{.Size}} bytes'
+
+      - name: Quick verification (tools + static analysis + MCP handshake)
+        run: |
+          mkdir -p work config
+          docker run --rm --shm-size=1g \
+            -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
+            rea-agent:ci /opt/rea/verify/verify-all.sh --quick
+
+      - name: Full verification (Ghidra multi-arch + Hopper + HTTP bridge)
+        if: github.event_name == 'workflow_dispatch' && inputs.full
+        run: |
+          docker run --rm --shm-size=4g \
+            -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
+            rea-agent:ci /opt/rea/verify/verify-all.sh
+
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-report
+          path: work/verify-reports
+          if-no-files-found: ignore

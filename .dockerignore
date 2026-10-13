@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.github
+vendor/*.deb
+vendor/ida/*
+vendor/hopper-state/*
+!vendor/README.md
+!vendor/.gitkeep
+work/
+targets/
+config/ida/*.hexlic
+config/ida-mcp.json
+config/rea.env
+docs/
+*.md
+!vendor/README.md

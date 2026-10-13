@@ -1,0 +1,5 @@
+{
+  "_comment": "Official Hex-Rays IDA MCP (HexRaysSA/ida-mcp) over Streamable HTTP. Use when the IDA MCP server runs inside a sidecar/other host and is published onto this container's loopback by the entrypoint (REA_IDA_MCP_FORWARD).",
+  "url": "http://127.0.0.1:8745/mcp",
+  "mode": "headless"
+}

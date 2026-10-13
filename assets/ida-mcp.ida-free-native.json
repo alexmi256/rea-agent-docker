@@ -1,0 +1,6 @@
+{
+  "_comment": "IDA Free via the ida-free-mcp native plugin (attached). The plugin binds 0.0.0.0 without a listen-address option - restrict it with the host firewall, or use a build that listens on loopback only. Direct callers are unavailable in this profile.",
+  "mode": "attached",
+  "protocol": "native",
+  "url": "http://127.0.0.1:13337/mcp"
+}

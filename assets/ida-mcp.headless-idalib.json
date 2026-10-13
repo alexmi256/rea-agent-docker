@@ -1,0 +1,9 @@
+{
+  "_comment": "Headless idalib supervisor (mrexodia/ida-pro-mcp) spawned by REA inside this container. Requires IDA Pro/Home with idalib activated (not IDA Free) and the `idalib-mcp` entry point on PATH. Set IDADIR for idalib environments that need it.",
+  "command": "idalib-mcp",
+  "args": ["--stdio", "--max-workers", "1"],
+  "mode": "headless",
+  "env": {
+    "IDADIR": "/opt/ida"
+  }
+}

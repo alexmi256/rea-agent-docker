@@ -1,0 +1,21 @@
+# runtime state / workspaces
+work/
+targets/
+evidence/
+config/rea.env
+config/ida-mcp.json
+
+# bring-your-own assets and licences: never committed
+vendor/*.deb
+vendor/*.rpm
+vendor/*.pkg.tar.xz
+vendor/ida/
+vendor/hopper-state/
+!vendor/ida/.gitkeep
+!vendor/hopper-state/.gitkeep
+*.hexlic
+*.lic
+
+# misc
+.env
+*.log

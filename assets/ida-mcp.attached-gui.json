@@ -1,0 +1,10 @@
+{
+  "_comment": "Attached profile: an IDA GUI (with ida-pro-mcp 1.4.0 legacy tools) is already open on the original binary. REA connects through the upstream stdio proxy and never saves or closes your database. Replace the paths with the ones from your working upstream registration.",
+  "command": "python3",
+  "args": [
+    "/opt/ida-pro-mcp/server.py",
+    "--ida-rpc",
+    "http://127.0.0.1:13337"
+  ],
+  "mode": "attached"
+}
