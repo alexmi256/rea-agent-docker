@@ -36,12 +36,22 @@ ARG DEBIAN_FRONTEND=noninteractive
 # --- pinned upstream versions ------------------------------------------------
 ARG REA_VERSION=6.4.0
 ARG NODE_VERSION=24.21.0
+# REA declares frida as an optional dependency (JS instrumentation). npm 11
+# blocks package install scripts by default, so frida's native binding is
+# installed explicitly with --allow-scripts and linked into REA's tree.
+ARG FRIDA_VERSION=17.23.2
 ARG GHIDRA_VERSION=12.1.4
 ARG GHIDRA_ZIP=ghidra_12.1.4_PUBLIC_20260921.zip
 ARG GHIDRA_SHA256=
 ARG GHIDRA_BASE_URL=https://github.com/NationalSecurityAgency/ghidra/releases/download
-ARG HOPPER_DEB_URL=https://www.hopperapp.com/downloader/public/Hopper-6.5.0-Linux-demo.deb
-ARG HOPPER_DEB_SHA1=f3aa66e3ebb3dc8a716538a96c3ef03d5c8ff789
+# Hopper: REA 6.4.0 admits ONE Linux build per package family, matched by the
+# launcher's SHA-256 (src/application/LinuxHopper.ts -> SUPPORTED_RELEASES/
+# SUPPORTED_HOPPER_SHA256). Its pinned demo package is Hopper 6.4.2. Leave
+# HOPPER_DEB_URL empty to derive that filename straight out of the installed
+# REA package; override it (and clear HOPPER_DEB_SHA1) for a licensed DEB.
+ARG HOPPER_DEB_URL=
+ARG HOPPER_DEB_SHA1=e4f79dff602648a8ff4a88b773875b6bfac0dc65
+ARG HOPPER_DEB_BYTES=35755772
 ARG WABT_VERSION=1.0.42
 ARG JADX_MCP_VERSION=0.7.1
 ARG APKTOOL_VERSION=2.12.1
@@ -135,7 +145,11 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     set -eux; \
     npm install --global --no-fund --no-audit "rea-agents@${REA_VERSION}"; \
-    rea --version
+    rea --version; \
+    npm install --global --no-fund --no-audit --allow-scripts=frida "frida@${FRIDA_VERSION}"; \
+    ln -sfn "$(npm root -g)/frida" "$(npm root -g)/rea-agents/node_modules/frida"; \
+    cd "$(npm root -g)/rea-agents"; \
+    node -e 'const f=require("frida"); console.log("frida binding:", require.resolve("frida")); f.getLocalDevice().then(d=>console.log("frida local device:", d.name)).catch(e=>{console.error("frida error:", e.message);process.exit(1);})'
 
 # =============================================================================
 # 4. Ghidra 12.1.x + JDK 21  (the multi-architecture engine)
@@ -178,11 +192,25 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
       echo "Using vendor-supplied Hopper package: $deb"; \
       cp "$deb" /tmp/hopper.deb; \
     else \
-      echo "Using official Hopper demo package: ${HOPPER_DEB_URL}"; \
-      [ -f hopper.deb ] || curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" \
-        -H "Referer: https://www.hopperapp.com/download" -o hopper.deb "${HOPPER_DEB_URL}"; \
-      echo "${HOPPER_DEB_SHA1}  hopper.deb" | sha1sum -c -; \
-      cp hopper.deb /tmp/hopper.deb; \
+      url="${HOPPER_DEB_URL}"; \
+      if [ -z "$url" ]; then \
+        filename="$(grep -rhoE 'Hopper-[0-9]+\.[0-9]+\.[0-9]+-Linux-demo\.deb' \
+          "$(npm root -g)/rea-agents/dist" 2>/dev/null | head -n1 || true)"; \
+        [ -n "$filename" ] || filename="Hopper-6.4.2-Linux-demo.deb"; \
+        url="https://www.hopperapp.com:443/downloader/public/${filename}"; \
+        echo "REA pins this Linux Hopper demo package: ${filename}"; \
+      fi; \
+      echo "Downloading ${url}"; \
+      debname="$(basename "$url")"; \
+      [ -f "$debname" ] || curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" \
+        -H "Referer: https://www.hopperapp.com/download" -o "$debname" "$url"; \
+      if [ -n "${HOPPER_DEB_BYTES}" ]; then \
+        test "$(stat -c %s "$debname")" = "${HOPPER_DEB_BYTES}"; \
+      fi; \
+      if [ -n "${HOPPER_DEB_SHA1}" ]; then \
+        echo "${HOPPER_DEB_SHA1}  ${debname}" | sha1sum -c -; \
+      fi; \
+      cp "$debname" /tmp/hopper.deb; \
     fi; \
     apt-get update -qq; \
     apt-get install -y --no-install-recommends /tmp/hopper.deb; \
@@ -191,7 +219,7 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
     apt-get clean; rm -rf /var/lib/apt/lists/*; \
     test -x "${HOPPER_LAUNCHER_PATH}"; \
     ldd "${HOPPER_LAUNCHER_PATH}" | grep -c "not found" || true; \
-    "${HOPPER_LAUNCHER_PATH}" --help 2>&1 | head -5 || echo "Hopper present (GUI binary)"
+    echo "Hopper launcher sha256: $(sha256sum "${HOPPER_LAUNCHER_PATH}" | cut -d' ' -f1)"
 
 # =============================================================================
 # 6. Optional in-image IDA Pro / IDA Home / IDA Free
@@ -259,6 +287,7 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_NOLOGO=1 \
     DOTNET_ROOT=/usr/lib/dotnet \
+    DOTNET_ROLL_FORWARD=Major \
     REA_ILSPY_CMD_PATH=/opt/dotnet-tools/ilspycmd
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -289,7 +318,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     /opt/venvs/pwntools/bin/pip install --upgrade pip; \
     /opt/venvs/pwntools/bin/pip install \
       "pwntools==${PWTOOLS_VERSION}" "pyelftools==${PYELFTOOLS_VERSION}" "unicorn==${UNICORN_VERSION}"; \
-    /opt/venvs/pwntools/bin/python -c "import pwn; from pwn import version; print('pwntools', version.version)"
+    /opt/venvs/pwntools/bin/python -c "import pwn; print('pwntools', pwn.version)"
 
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     set -eux; \
@@ -349,8 +378,14 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
       google-chrome --version; \
     fi; \
     if [ "${INSTALL_PLAYWRIGHT}" = "1" ]; then \
-      pwc="/usr/lib/node_modules/rea-agents/node_modules/playwright-core/cli.js"; \
-      test -f "$pwc"; \
+      pw_root="$(npm root -g)"; \
+      pwc=""; \
+      for c in "$pw_root/rea-agents/node_modules/playwright-core/cli.js" \
+               "$pw_root/playwright-core/cli.js"; do \
+        if [ -f "$c" ]; then pwc="$c"; break; fi; \
+      done; \
+      test -n "$pwc"; \
+      echo "installing Playwright Chromium via $pwc"; \
       node "$pwc" install --with-deps chromium; \
       ls -1 /opt/ms-playwright; \
     fi
@@ -388,6 +423,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
         gcc-mips-linux-gnu gcc-mipsel-linux-gnu \
         gcc-riscv64-linux-gnu gcc-powerpc-linux-gnu \
+        libc6-dev-arm64-cross libc6-dev-armhf-cross \
+        libc6-dev-mips-cross libc6-dev-mipsel-cross \
+        libc6-dev-riscv64-cross libc6-dev-powerpc-cross \
         mingw-w64 || true; \
     fi; \
     apt-get clean; rm -rf /var/lib/apt/lists/*; \
@@ -434,7 +472,10 @@ RUN set -eux; \
     /opt/dotnet-tools/ilspycmd --version 2>&1 | head -3 || true
 
 # --- operational env ---------------------------------------------------------
-ENV REA_MCP_INPUT_SCHEMA_PROFILE=compact \
+# TERM keeps PTY-oriented tooling (pwntools, mitmdump, chrome) quiet; REA uses
+# its own PTY for process capture.
+ENV TERM=xterm \
+    REA_MCP_INPUT_SCHEMA_PROFILE=compact \
     TMPDIR=/tmp/rea \
     NODE_OPTIONS=--max-old-space-size=8192
 

@@ -2,8 +2,11 @@
 work/
 targets/
 evidence/
-config/rea.env
 config/ida-mcp.json
+
+# NOTE: config/rea.env is a committed *template* (comments only) because
+# compose mounts ./config and loads it via env_file - it must exist. Keep your
+# real overrides local if they carry anything sensitive.
 
 # bring-your-own assets and licences: never committed
 vendor/*.deb

@@ -72,9 +72,21 @@ Keep at least ~2× the largest target's expected working set free on the host;
 
 ## Hopper
 
-**`rea doctor --provider hopper --json` is unhealthy**
-`ldd /opt/hopper/bin/Hopper | grep 'not found'` must print nothing. REA's Linux
-path also needs Xvfb, Python 3 and the X11/XTEST libraries (all installed).
+**`rea doctor --provider hopper --json` is unhealthy (`hopper-version`
+`config_drift`)**
+REA matches the Hopper *launcher's SHA-256* against the single Linux build it
+validated per package family. REA 6.4.0 pins Hopper 6.4.2 (demo), which is what
+this image installs; a licensed or hand-built Hopper will report drift even
+though it may analyse fine. To check which build your REA expects:
+
+```bash
+docker run --rm rea-agent:latest bash -c \
+  'grep -rhoE "Hopper-[0-9.]+-Linux-demo[.a-z]+" "$(npm root -g)/rea-agents/dist" | sort -u'
+```
+
+**`ldd /opt/hopper/bin/Hopper` shows missing libraries**
+REA's Linux path also needs Xvfb, Python 3 and the X11/XTEST libraries (all
+installed in this image). Add anything else the launcher reports.
 
 **Analysis fails with a licence/demo dialog**
 On macOS the demo/licence prompt must be completed in a user session; on Linux
@@ -143,6 +155,29 @@ startup, no hot reload). Check the container is running
 The client's own per-call timeout is shorter than the provider's first-query
 work. Raise `timeout` on the `mcp_servers.rea` entry (1800 s is a sane default
 for Ghidra).
+
+**Every REA command fails with `configuration_invalid`**
+You passed an *empty* `REA_*` variable. REA validates its settings and rejects
+zero-length strings:
+
+```
+REA configuration is invalid: REA_ANALYSIS_PROVIDER: Too small: expected string
+to have >=1 characters; REA_IDA_MCP_CONFIG must be absolute; ...
+```
+
+The usual cause is `VAR: ${VAR:-}` in a compose `environment:` map (or an
+`--env-file` whose file contains `REA_ANALYSIS_PROVIDER=`). Keep an unset knob
+*undefined*: put optional settings in `config/rea.env` (loaded via compose
+`env_file`, which only defines present variables) and never list them with an
+empty default. Comment a line out instead of blanking it.
+
+**Frida tools do not appear in the MCP catalog**
+REA 6.4.0 (the npm release) ships no frida tools — the family exists on
+repository `main` and will arrive in a later release. The image installs and
+verifies the frida binding (`getLocalDevice()` returns the local system), so a
+later `REA_VERSION` build arg picks it up with no other change. `rea --help`
+is the ground truth: if it lists no frida command, the release you installed
+has none.
 
 **HTTP bridge unreachable**
 `REA_MCP_HTTP_BIND` defaults to `127.0.0.1` on the Docker host. Containerised

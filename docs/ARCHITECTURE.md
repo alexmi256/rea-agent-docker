@@ -23,7 +23,7 @@ build-arg default in the `Dockerfile`, so a rebuild reproduces the same set.
 | 2 | **Node.js** + npm | 24.21.0 (REA needs 22.19+/24.11+/26+) |
 | 3 | **REA** (`rea-agents`) globally installed → `rea` on PATH | 6.4.0 |
 | 4 | **Ghidra** + JDK 21, native decompiler for `linux_x86_64` | Ghidra 12.1.4, OpenJDK 21 |
-| 5 | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime | Hopper 6.5.0 Linux |
+| 5 | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime | Hopper 6.4.2 Linux |
 | 6 | optional in-image **IDA** (only from `vendor/ida/*.run`) | off by default |
 | 7 | **WABT** (wasm toolchain) and **jadx-headless-mcp** (Android Java engine) | WABT 1.0.42, jadx-headless-mcp 0.7.1 |
 | 8 | **Apktool** launcher (Java wrapper + jar) | 2.12.1 (2.x line REA verified) |
@@ -58,7 +58,7 @@ in compose `environment:` (applies to `docker exec` too).
 
 ```
 /opt/ghidra                 Ghidra 12.1.4 (GHIDRA_INSTALL_DIR)
-/opt/hopper                 Hopper 6.5.0 demo + bundled GNUstep libs
+/opt/hopper                 Hopper 6.4.2 demo + bundled GNUstep libs
 /opt/ida                    IDA mount point (empty unless you mount INSTALL)
 /opt/venvs/{pwntools,unblob,mitmproxy}
 /opt/pwndbg                 pwndbg checkout + .venv

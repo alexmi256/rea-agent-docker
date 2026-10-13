@@ -25,11 +25,14 @@ services:
   rea-agent:
     environment:
       REA_ANALYSIS_PROVIDER: ${REA_ANALYSIS_PROVIDER:-ida}
+      # Point this at a registration file; /etc/rea/ida-mcp.json comes from
+      # ./config/ida-mcp.json (see docs/BYO-LICENSES.md).
       REA_IDA_MCP_CONFIG: ${REA_IDA_MCP_CONFIG:-/etc/rea/ida-mcp.json}
       IDADIR: ${IDADIR:-/opt/ida}
-      # Only used when the IDA MCP server runs outside this container.
-      REA_IDA_MCP_FORWARD: ${REA_IDA_MCP_FORWARD:-}
       REA_IDA_MCP_LOCAL_PORT: ${REA_IDA_MCP_LOCAL_PORT:-8745}
+      # REA_IDA_MCP_FORWARD (only for a sidecar/remote IDA MCP) is optional and
+      # must not be defined empty - REA rejects empty values. Put it in
+      # ./config/rea.env, e.g.  REA_IDA_MCP_FORWARD=ida-mcp:8745
     volumes:
       - ${IDA_INSTALL_DIR:-./vendor/ida}:/opt/ida:ro
       - ${IDA_LICENSE_DIR:-./config/ida}:/etc/rea/ida:ro

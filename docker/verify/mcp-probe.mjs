@@ -13,6 +13,7 @@ import { existsSync } from "node:fs";
 const serverCmd = process.env.REA_MCP_SERVER ?? "rea";
 const serverArgs = (process.env.REA_MCP_ARGS ?? "mcp").split(" ").filter(Boolean);
 const sqlitePath = process.env.REA_VERIFY_SQLITE ?? "/tmp/rea-verify/fixtures/fixture.sqlite";
+const jsappDir = process.env.REA_VERIFY_JSAPP ?? "/tmp/rea-verify/fixtures/jsapp";
 const binaryPath = process.env.REA_VERIFY_BINARY ?? "/tmp/rea-verify/fixtures/fixture-x86_64.elf";
 const provider = process.env.REA_VERIFY_PROVIDER ?? "ghidra";
 const doAnalysis = (process.env.REA_VERIFY_MCP_ANALYSIS ?? "1") === "1";
@@ -90,21 +91,28 @@ try {
     if (names.length < 50) throw new Error(`tool catalog suspiciously small: ${names.length}`);
 
     if (existsSync(sqlitePath)) {
-        const call = await request("tools/call", {
-            name: "inspect_sqlite_database",
-            arguments: { path: sqlitePath, table: "settings", row_limit: 5 },
-        });
-        const text = (call?.content ?? []).map((c) => c.text ?? "").join("\n");
-        summary.steps["tools/call:inspect_sqlite_database"] = {
-            isError: Boolean(call?.isError),
-            mentionedTables: /settings|license_requests/.test(text),
-            bytes: text.length,
-        };
-        if (call?.isError || !/settings|license_requests/.test(text)) {
-            throw new Error("sqlite tool call did not return the fixture tables");
+        const candidates = [
+            { tool: "inspect_artifact", path: jsappDir, args: { path: jsappDir }, expect: /package\.json|src|jsapp|artifact/i },
+            { tool: "inspect_sqlite_database", path: sqlitePath, args: { path: sqlitePath, table: "settings", row_limit: 5 }, expect: /settings|license_requests/ },
+            { tool: "inspect_binary_layout", path: binaryPath, args: { path: binaryPath }, expect: /main|section|segment/i },
+        ];
+        const chosen = candidates.find((c) => names.includes(c.tool) && existsSync(c.path));
+        if (!chosen) {
+            summary.steps["tools/call:engine-free"] = { skipped: "no engine-free tool in this release" };
+        } else {
+            const call = await request("tools/call", { name: chosen.tool, arguments: chosen.args });
+            const text = (call?.content ?? []).map((c) => c.text ?? "").join("\n");
+            summary.steps[`tools/call:${chosen.tool}`] = {
+                isError: Boolean(call?.isError),
+                matched: chosen.expect.test(text),
+                bytes: text.length,
+            };
+            if (call?.isError || !chosen.expect.test(text)) {
+                throw new Error(`tools/call ${chosen.tool} did not return usable data`);
+            }
         }
     } else {
-        summary.steps["tools/call:inspect_sqlite_database"] = { skipped: "fixture missing" };
+        summary.steps["tools/call:engine-free"] = { skipped: "fixture missing" };
     }
 
     if (doAnalysis && existsSync(binaryPath)) {

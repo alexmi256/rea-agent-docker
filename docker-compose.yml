@@ -23,7 +23,10 @@ services:
         NODE_VERSION: ${NODE_VERSION:-24.21.0}
         GHIDRA_VERSION: ${GHIDRA_VERSION:-12.1.4}
         GHIDRA_ZIP: ${GHIDRA_ZIP:-ghidra_12.1.4_PUBLIC_20260921.zip}
-        HOPPER_DEB_URL: ${HOPPER_DEB_URL:-https://www.hopperapp.com/downloader/public/Hopper-6.5.0-Linux-demo.deb}
+        GHIDRA_SHA256: ${GHIDRA_SHA256:-}
+        HOPPER_DEB_URL: ${HOPPER_DEB_URL:-}
+        HOPPER_DEB_SHA1: ${HOPPER_DEB_SHA1:-e4f79dff602648a8ff4a88b773875b6bfac0dc65}
+        HOPPER_DEB_BYTES: ${HOPPER_DEB_BYTES:-35755772}
         INSTALL_CHROME: ${INSTALL_CHROME:-1}
         INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-1}
         INSTALL_PWNDBG: ${INSTALL_PWNDBG:-1}
@@ -47,8 +50,11 @@ services:
     shm_size: ${REA_SHM_SIZE:-1gb}
     environment:
       # --- analysis engine selection -------------------------------------
-      # REA_ANALYSIS_PROVIDER: ghidra | hopper | ida   (unset = auto-select)
-      REA_ANALYSIS_PROVIDER: ${REA_ANALYSIS_PROVIDER:-}
+      # NOTE: REA rejects *empty* values for its own REA_* settings
+      # ("configuration_invalid: Too small: expected string to have >=1
+      # characters"), so optional settings are NOT listed here with an empty
+      # default. Put them in ./config/rea.env (loaded through env_file below,
+      # which only defines variables that are actually present).
       GHIDRA_INSTALL_DIR: ${GHIDRA_INSTALL_DIR:-/opt/ghidra}
       JAVA_HOME: ${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}
       HOPPER_LAUNCHER_PATH: ${HOPPER_LAUNCHER_PATH:-/opt/hopper/bin/Hopper}
@@ -56,28 +62,18 @@ services:
       REA_GHIDRA_STARTUP_TIMEOUT_MS: ${REA_GHIDRA_STARTUP_TIMEOUT_MS:-900000}
       REA_HOPPER_STARTUP_TIMEOUT_MS: ${REA_HOPPER_STARTUP_TIMEOUT_MS:-300000}
       GHIDRA_HEADLESS_MAXMEM: ${GHIDRA_HEADLESS_MAXMEM:-4G}
-      REA_GHIDRA_DISABLED_ANALYZERS: ${REA_GHIDRA_DISABLED_ANALYZERS:-}
-      REA_GHIDRA_LANGUAGE_ID: ${REA_GHIDRA_LANGUAGE_ID:-}
-      REA_GHIDRA_COMPILER_SPEC_ID: ${REA_GHIDRA_COMPILER_SPEC_ID:-}
-      REA_GHIDRA_SEED_FILE: ${REA_GHIDRA_SEED_FILE:-}
-      REA_GHIDRA_NATIVEAOT_JAR: ${REA_GHIDRA_NATIVEAOT_JAR:-}
-      # --- IDA / JEB (bring your own) -------------------------------------
+      # --- IDA / JEB mount points (engines themselves are bring-your-own) --
       IDADIR: ${IDADIR:-/opt/ida}
-      REA_IDA_MCP_CONFIG: ${REA_IDA_MCP_CONFIG:-}
-      REA_IDA_MCP_FORWARD: ${REA_IDA_MCP_FORWARD:-}
       REA_IDA_MCP_LOCAL_PORT: ${REA_IDA_MCP_LOCAL_PORT:-8745}
-      REA_JEB_MCP_URL: ${REA_JEB_MCP_URL:-}
-      REA_JEB_MCP_FORWARD: ${REA_JEB_MCP_FORWARD:-}
-      # --- MCP client shaping (REA ships 170+ tools; compact trims schemas) -
+      # --- MCP client shaping ---------------------------------------------
       REA_MCP_INPUT_SCHEMA_PROFILE: ${REA_MCP_INPUT_SCHEMA_PROFILE:-compact}
-      REA_MCP_MAX_RESPONSE_BYTES: ${REA_MCP_MAX_RESPONSE_BYTES:-}
       # --- auxiliary engines ----------------------------------------------
       REA_PWNTOOLS_PYTHON: /opt/venvs/pwntools/bin/python
       REA_PWNDBG_GDB: /usr/bin/gdb
       REA_PWNDBG_GDBINIT: /opt/pwndbg/gdbinit.py
       REA_PWNDBG_VENV_PATH: /opt/pwndbg/.venv
       REA_WABT_BIN_DIRECTORY: /opt/wabt/bin
-      REA_JADX_MCP_JAR: /opt/jadx/jadx-headless-mcp-${JADX_MCP_VERSION:-0.7.1}-all.jar
+      REA_JADX_MCP_JAR: /opt/jadx/jadx-headless-mcp-0.7.1-all.jar
       REA_APKTOOL_COMMAND: /usr/local/bin/apktool
       REA_ADB_PATH: /usr/bin/adb
       REA_BINWALK_COMMAND: /usr/local/bin/binwalk
@@ -88,11 +84,18 @@ services:
       REA_MITMDUMP_COMMAND: /opt/venvs/mitmproxy/bin/mitmdump
       REA_ILSPY_CMD_PATH: /opt/dotnet-tools/ilspycmd
       REA_BROWSER_NO_SANDBOX: ${REA_BROWSER_NO_SANDBOX:-1}
-      REA_BROWSER_EXECUTABLE: ${REA_BROWSER_EXECUTABLE:-}
       PLAYWRIGHT_BROWSERS_PATH: /opt/ms-playwright
       REA_LOG_LEVEL: ${REA_LOG_LEVEL:-info}
       REA_ENTRYPOINT_DOCTOR: ${REA_ENTRYPOINT_DOCTOR:-1}
       TMPDIR: /tmp/rea
+    # Optional REA_* settings live here (REA_ANALYSIS_PROVIDER, IDA/JEB MCP
+    # registrations, Ghidra language/seed/analyzer overrides, timeouts,
+    # REA_MCP_MAX_RESPONSE_BYTES, ...). Only variables you actually write are
+    # defined, which keeps REA's config validation happy. Copy the template:
+    #   cp docker/rea.env.example config/rea.env
+    env_file:
+      - path: ./config/rea.env
+        required: false
     volumes:
       # Analysis workspace: targets to inspect, snapshots, exported Evidence.
       - ./work:/work

@@ -30,19 +30,25 @@ services:
     ports:
       - "${REA_MCP_HTTP_BIND:-127.0.0.1}:${REA_MCP_HTTP_PORT:-8811}:8811"
     environment:
-      REA_ANALYSIS_PROVIDER: ${REA_ANALYSIS_PROVIDER:-}
-      REA_MCP_INPUT_SCHEMA_PROFILE: ${REA_MCP_INPUT_SCHEMA_PROFILE:-compact}
-      REA_MCP_MAX_RESPONSE_BYTES: ${REA_MCP_MAX_RESPONSE_BYTES:-}
+      GHIDRA_INSTALL_DIR: ${GHIDRA_INSTALL_DIR:-/opt/ghidra}
+      JAVA_HOME: ${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}
+      HOPPER_LAUNCHER_PATH: ${HOPPER_LAUNCHER_PATH:-/opt/hopper/bin/Hopper}
+      HOPPER_STATE_DIR: ${HOPPER_STATE_DIR:-/home/rea/.local/share/hopper}
       REA_GHIDRA_STARTUP_TIMEOUT_MS: ${REA_GHIDRA_STARTUP_TIMEOUT_MS:-900000}
       REA_HOPPER_STARTUP_TIMEOUT_MS: ${REA_HOPPER_STARTUP_TIMEOUT_MS:-300000}
       GHIDRA_HEADLESS_MAXMEM: ${GHIDRA_HEADLESS_MAXMEM:-4G}
+      REA_MCP_INPUT_SCHEMA_PROFILE: ${REA_MCP_INPUT_SCHEMA_PROFILE:-compact}
       IDADIR: ${IDADIR:-/opt/ida}
-      REA_IDA_MCP_CONFIG: ${REA_IDA_MCP_CONFIG:-}
-      REA_IDA_MCP_FORWARD: ${REA_IDA_MCP_FORWARD:-}
-      REA_JEB_MCP_URL: ${REA_JEB_MCP_URL:-}
-      REA_JEB_MCP_FORWARD: ${REA_JEB_MCP_FORWARD:-}
+      REA_IDA_MCP_LOCAL_PORT: ${REA_IDA_MCP_LOCAL_PORT:-8745}
+      REA_BROWSER_NO_SANDBOX: ${REA_BROWSER_NO_SANDBOX:-1}
       REA_ENTRYPOINT_DOCTOR: "0"
       TMPDIR: /tmp/rea
+    # Optional REA_* settings (REA_ANALYSIS_PROVIDER, IDA/JEB registrations,
+    # REA_MCP_MAX_RESPONSE_BYTES, ...) come from ./config/rea.env. REA rejects
+    # empty values, so they must not be defined here with empty defaults.
+    env_file:
+      - path: ./config/rea.env
+        required: false
     volumes:
       - ./work:/work
       - ${REA_TARGETS_DIR:-./targets}:/targets:ro

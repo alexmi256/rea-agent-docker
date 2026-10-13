@@ -48,8 +48,11 @@ host_path() {
 mkdir -p "$PROJECT_DIR/work" "$PROJECT_DIR/config"
 WORK="$(host_path "$PROJECT_DIR/work")"
 CONFIG="$(host_path "$PROJECT_DIR/config")"
-ENVFILE=()
-[ -f "$PROJECT_DIR/.env" ] && ENVFILE=(--env-file "$PROJECT_DIR/.env")
+
+# NOTE: .env is intentionally NOT passed with --env-file. It contains
+# interpolated settings only; forwarding its (sometimes empty) REA_* entries
+# would make REA fail config validation ("Too small: expected string to have
+# >=1 characters"). Optional REA_* overrides belong in config/rea.env.
 
 # Run as the host user that owns ./work, so reports and /work stay readable.
 # REA_UID/REA_GID come from .env when present; the image user is uid 1000.
@@ -57,7 +60,6 @@ RUN_USER="${REA_UID:-$(id -u)}:${REA_GID:-$(id -g)}"
 echo "running harness in $IMAGE as $RUN_USER"
 exec "$DOCKER" run --rm -i --shm-size=1g \
     --user "$RUN_USER" \
-    "${ENVFILE[@]}" \
     -v "$WORK:/work" \
     -v "$CONFIG:/etc/rea:ro" \
     "$IMAGE" /opt/rea/verify/verify-all.sh ${ARGS[@]+"${ARGS[@]}"}

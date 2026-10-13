@@ -88,10 +88,10 @@ the skill on the Hermes side instead:
 npx skills add morluto/rea --skill reverse-engineer-anything
 ```
 
-or copy it out of the image:
+or copy it out of the image (npm's global root is `/usr/local/lib/node_modules`):
 
 ```bash
-docker cp rea-agent:/usr/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/.agents/skills/reverse-engineer-anything \
   ~/.hermes/skills/
 ```
 

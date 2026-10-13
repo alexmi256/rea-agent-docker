@@ -16,10 +16,10 @@ if node "$DIR/mcp-probe.mjs" >"$probe" 2>"$LOGDIR/mcp-probe.err"; then
     else
         _bad "mcp tools/list" "only ${count:-0} tools advertised (see $probe)"
     fi
-    if jq -e '.steps["tools/call:inspect_sqlite_database"].mentionedTables == true' "$probe" >/dev/null 2>&1; then
-        _ok "mcp tools/call: inspect_sqlite_database"
+    if jq -e '[.steps | to_entries[] | select(.key|startswith("tools/call:")) | select(.value.isError == false and (.value.bytes // 0) > 0)] | length > 0' "$probe" >/dev/null 2>&1; then
+        _ok "mcp tools/call: engine-free tool returned data"
     else
-        _bad "mcp tools/call: inspect_sqlite_database" "see $probe"
+        _bad "mcp tools/call: engine-free tool" "see $probe"
     fi
     key="$(jq -r '.steps | keys[] | select(startswith("tools/call:open_binary"))' "$probe" 2>/dev/null | head -1)"
     if [ -n "$key" ] && jq -e --arg k "$key" '.steps[$k].isError == false' "$probe" >/dev/null 2>&1; then

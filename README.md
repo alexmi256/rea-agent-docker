@@ -12,7 +12,7 @@ engineering without installing a single tool on the host.
 * **Base:** `ubuntu:24.04` — the distribution REA's Hopper installer and
   Ghidra/JDK bindings are verified against, and the one that resolves every
   pinned helper version from apt.
-* **Engines:** Ghidra 12.1.4 (multi-architecture, the default), Hopper 6.5.0
+* **Engines:** Ghidra 12.1.4 (multi-architecture, the default), Hopper 6.4.2
   (public demo, headless via Xvfb), IDA Pro/Home/Free (bring your own licence).
 * **Surface:** REA's MCP server, ~170 tools, stdio by default (spawned by the
   client through `docker exec`) or Streamable HTTP via an optional bridge.
@@ -61,7 +61,7 @@ Full walkthrough: [docs/HERMES-MCP.md](docs/HERMES-MCP.md).
 | Family | Tools | Pinned |
 | ------ | ----- | ------ |
 | REA | `rea-agents` CLI + MCP server | 6.4.0 (Node 24.21.0) |
-| Native engines | Ghidra + JDK 21, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.1.4, Hopper 6.5.0 |
+| Native engines | Ghidra + JDK 21, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.1.4, Hopper 6.4.2 |
 | ELF/core analysis | pwntools + pyelftools + Unicorn in a venv, `gdb` + `gdb-multiarch`, pwndbg | pwntools 4.15.0, pyelftools 0.33, Unicorn 2.1.2, pwndbg 2026.09.15 |
 | Firmware | binwalk (built from source), unblob + extractors (`debugfs`, 7z, squashfs, cpio, dtc, lz4/lzop/lzip, cabextract, ...) | binwalk 3.1.0, unblob 26.6.4 |
 | Packets / signals | tshark + capinfos, tcpdump, sigrok-cli + libsigrokdecode | TShark 4.2.2, sigrok-cli 0.7.2 |
@@ -69,7 +69,7 @@ Full walkthrough: [docs/HERMES-MCP.md](docs/HERMES-MCP.md).
 | Android | jadx-headless-mcp JAR, Apktool, adb | jadx-headless-mcp 0.7.1, Apktool 2.12.1 |
 | Managed code | .NET SDK 8 + ilspycmd | ilspycmd 8.2.0.7535 |
 | WASM / EVM | WABT, bundled EVMole (npm) | WABT 1.0.42 |
-| Dynamic / cross-arch | Frida (npm binding), qemu-user-static (all targets), wine, cross toolchains (aarch64, arm, mips, mipsel, riscv64, powerpc, mingw-w64) | Frida 17.23.2 |
+| Dynamic / cross-arch | Frida (npm binding installed and loadable), qemu-user-static (all targets), wine, cross toolchains (aarch64, arm, mips, mipsel, riscv64, powerpc, mingw-w64) | Frida 17.23.2 binding |
 | MCP plumbing | uv (for PyPI MCP servers), supergateway (stdio ↔ Streamable HTTP) | uv 0.13.0, supergateway 4.1.0 |
 
 Layer-by-layer detail, and what is deliberately **not** included:

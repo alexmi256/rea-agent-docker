@@ -16,7 +16,7 @@ directory is ever committed (see `.gitignore`).
 
 ```bash
 # You own a Hopper licence and downloaded the licensed DEB:
-cp ~/Downloads/Hopper-6.5.0-Linux.deb vendor/
+cp ~/Downloads/Hopper-6.4.2-Linux.deb vendor/
 docker compose build --build-arg HOPPER_DEB_URL= --no-cache rea-agent
 ```
 

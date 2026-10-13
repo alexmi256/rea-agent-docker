@@ -20,8 +20,17 @@ else
 fi
 
 section "ghidra: architecture coverage (multi-arch is the point)"
-for t in fixture-x86_64.elf:linux-x86_64 \
-         fixture-aarch64.elf:linux-aarch64 \
+# x86-64 gets the full overview; every other architecture proves its import
+# language works by finding the fixture's own string literal through the
+# analysis session.
+if [ -s "$FIX/fixture-x86_64.elf" ]; then
+    check_json "ghidra analyze linux-x86_64" '[.. | strings] | join(" ") | test("reverse-me|checksum|main")' \
+        -- timeout "$TIMEOUT_SECONDS" rea analyze "$FIX/fixture-x86_64.elf" --provider ghidra --json
+else
+    _skip "ghidra analyze linux-x86_64" "fixture missing"
+fi
+
+for t in fixture-aarch64.elf:linux-aarch64 \
          fixture-armv7.elf:linux-armv7 \
          fixture-mips.elf:linux-mips32-be \
          fixture-mipsel.elf:linux-mips32-le \
@@ -29,22 +38,19 @@ for t in fixture-x86_64.elf:linux-x86_64 \
          fixture-ppc.elf:linux-powerpc \
          fixture-win64.exe:windows-pe-x64; do
     file="${t%%:*}"; label="${t##*:}"
-    if [ ! -s "$FIX/$file" ]; then _skip "ghidra analyze $label" "fixture missing"; continue; fi
-    if command -v timeout >/dev/null 2>&1; then
-        check_json "ghidra analyze $label" '[.. | strings] | join(" ") | test("reverse-me|checksum|main")' \
-            -- timeout "$TIMEOUT_SECONDS" rea analyze "$FIX/$file" --provider ghidra --json
-    else
-        check_json "ghidra analyze $label" '[.. | strings] | join(" ") | test("reverse-me|checksum|main")' \
-            -- rea analyze "$FIX/$file" --provider ghidra --json
-    fi
+    if [ ! -s "$FIX/$file" ]; then _skip "ghidra search $label" "fixture missing"; continue; fi
+    check "ghidra search $label finds fixture string" "reverse-me" \
+        -- timeout "$TIMEOUT_SECONDS" rea search "$FIX/$file" "reverse-me" --provider ghidra --json
 done
 
 section "ghidra: function and decompiler output"
 check_json "ghidra function main (x86_64)" 'true' -- rea function "$TARGET" main --provider ghidra --json
 check "ghidra decompile main mentions the fixture strings" "reverse-me|checksum|printf" \
     -- rea decompile "$TARGET" main --provider ghidra --json
-check "ghidra string search finds the literal" "reverse-me" \
-    -- rea search "$TARGET" "reverse-me" --provider ghidra --json
+check "ghidra decompile aarch64 main" "reverse-me|checksum|printf|memcpy" \
+    -- timeout "$TIMEOUT_SECONDS" rea decompile "$FIX/fixture-aarch64.elf" main --provider ghidra --json
+check "ghidra decompile mips32 main" "reverse-me|checksum|printf|strlen" \
+    -- timeout "$TIMEOUT_SECONDS" rea decompile "$FIX/fixture-mips.elf" main --provider ghidra --json
 check "ghidra instructions at entry" "true" \
     -- rea instructions "$TARGET" 0x1000 --provider ghidra --json
 

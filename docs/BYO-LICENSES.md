@@ -26,12 +26,31 @@ REA's use (REA drives the Linux demo headlessly on a private Xvfb display and
 chooses demo mode itself). Demo limits: no save/export, no debugger backend,
 30-minute sessions.
 
+**Version pin matters.** REA does not just check that Hopper exists: it hashes
+the launcher binary and compares it against the launcher digests of the one
+Linux package it was validated with per package family
+(`SUPPORTED_RELEASES`/`SUPPORTED_HOPPER_SHA256` in
+`src/application/LinuxHopper.ts`). For REA 6.4.0 that is **Hopper 6.4.2
+(Linux demo)**. A different build makes `rea doctor --provider hopper --json`
+report `hopper-version` as `config_drift`.
+
+This image therefore ships the pinned build by default, and derives the
+filename from the installed REA package at build time rather than hardcoding
+it:
+
 ```bash
-# default (public demo 6.5.0) - already what `docker compose build` does
+grep -rohE 'Hopper-[0-9]+\.[0-9]+\.[0-9]+-Linux-demo\.deb' "$(npm root -g)/rea-agents/dist" | head -1
+```
+
+The launcher digest is printed by the build log
+(`Hopper launcher sha256: 0294ced1…`) and is in REA's supported set.
+
+```bash
+# default (public demo 6.4.2 - the build REA 6.4.0 pins) - what compose does
 docker compose build rea-agent
 
 # licensed package: drop the DEB into vendor/ and rebuild
-cp ~/Downloads/Hopper-6.5.0-Linux.deb vendor/
+cp ~/Downloads/Hopper-6.4.2-Linux.deb vendor/
 docker compose build --build-arg HOPPER_DEB_URL= rea-agent
 docker compose exec rea-agent rea doctor --provider hopper --json
 ```

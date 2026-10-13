@@ -93,6 +93,41 @@ check_json_file() {
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# --- release-aware helpers ---------------------------------------------------
+# REA's catalog differs between the npm release and repository main (main is
+# ahead: sqlite/wasm/go/pcap/signal/frida families are not in 6.4.0). A family
+# the installed release does not expose is reported as SKIP, never FAIL, so the
+# harness stays useful across REA upgrades.
+rea_commands() {
+    if [ -z "${REA_COMMAND_LIST:-}" ]; then
+        REA_COMMAND_LIST="$(rea --help 2>/dev/null | sed -n '/^Commands:/,$p' | awk '{print $1}')"
+    fi
+    printf '%s\n' "$REA_COMMAND_LIST"
+}
+rea_has_command() { rea_commands | grep -qx "$1"; }
+
+# check_rea <check-name> <rea-command> <grep-pattern> -- <args...>
+check_rea() {
+    local name="$1" cmd="$2" pattern="$3"; shift 3
+    [ "${1:-}" = "--" ] && shift
+    if ! rea_has_command "$cmd"; then
+        _skip "$name" "rea $cmd is not in REA $(rea --version 2>/dev/null) (present on main)"
+        return 0
+    fi
+    check "$name" "$pattern" -- rea "$cmd" "$@"
+}
+
+# check_rea_json <check-name> <rea-command> <jq-filter> -- <args...>
+check_rea_json() {
+    local name="$1" cmd="$2" filter="$3"; shift 3
+    [ "${1:-}" = "--" ] && shift
+    if ! rea_has_command "$cmd"; then
+        _skip "$name" "rea $cmd is not in REA $(rea --version 2>/dev/null)"
+        return 0
+    fi
+    check_json "$name" "$filter" -- rea "$cmd" "$@"
+}
+
 require_tool() { # require_tool <binary> <check-name> -> nonzero when missing
     if have "$1"; then return 0; fi
     _skip "$2" "$1 not installed"

@@ -39,7 +39,7 @@ rm -f "$FIX/hello.zig"
 build_native() { # build_native <name> <compiler>
     local out="$FIX/$1" cc="$2"
     command -v "$cc" >/dev/null 2>&1 || return 1
-    "$cc" -O1 -fno-strip -o "$out" "$FIX/hello.c" >/dev/null 2>&1 || return 1
+    "$cc" -O1 -o "$out" "$FIX/hello.c" >/dev/null 2>&1 || return 1
     [ -s "$out" ] || return 1
 }
 

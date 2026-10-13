@@ -80,5 +80,5 @@ mcp_servers:
 #
 # or copy the workflow out of the container:
 #
-#   docker cp rea-agent:/usr/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+#   docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/.agents/skills/reverse-engineer-anything \
 #     ~/.hermes/skills/
