@@ -119,20 +119,22 @@ minority of it. Measured on this project's build host:
 
 | Image | Size (`docker image inspect .Size`) |
 | --- | --- |
-| `rea-agent` (Ghidra + Hopper) | 8.39 GiB — 9,008,646,760 bytes |
-| `rea-agent-ghidra` | 8.30 GiB — 8,916,514,893 bytes |
-| `rea-agent-hopper` | 7.55 GiB — 8,102,794,596 bytes |
-| `rea-agent-ida` | 7.46 GiB — 8,010,622,529 bytes |
+| `rea-agent` (Ghidra + Hopper) | 8.39 GiB — 9,008,689,771 bytes |
+| `rea-agent-ghidra` | 8.30 GiB — 8,916,518,011 bytes |
+| `rea-agent-hopper` | 7.55 GiB — 8,102,797,549 bytes |
+| `rea-agent-ida` | 7.46 GiB — 8,010,625,009 bytes |
 
-Measured with `make sizes` on this build host (amd64). Read the deltas rather
-than the totals: **Ghidra costs ~906 MB and Hopper ~92 MB** on top of the
-engine-less `ida` image (Hopper's Qt6/X11 runtime is already in the shared base
-layers, which the browser tooling needs anyway). The auxiliary toolchain is the
-rest, so the engine choice is a smaller lever on size than you might expect —
-what you really buy with a single-engine image is a smaller surface (no second
-engine's libraries, licence files or runtime in the container), a quicker build,
-and a `rea providers` listing that can only say one thing. If size is the goal,
-switch components off instead:
+Measured with `make sizes` on this build host (amd64); the byte counts move by a
+few tens of KB between rebuilds even with identical inputs (layer timestamps), so
+treat the GiB figures as the stable number. Read the deltas rather than the
+totals: **Ghidra costs ~906 MB and Hopper ~92 MB** on top of the engine-less
+`ida` image (Hopper's Qt6/X11 runtime is already in the shared base layers, which
+the browser tooling needs anyway). The auxiliary toolchain is the rest, so the
+engine choice is a smaller lever on size than you might expect — what you really
+buy with a single-engine image is a smaller surface (no second engine's
+libraries, licence files or runtime in the container), a quicker build, and a
+`rea providers` listing that can only say one thing. If size is the goal, switch
+components off instead:
 
 ```bash
 scripts/build.sh --engine ghidra \
