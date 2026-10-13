@@ -1,5 +1,8 @@
 # rea-agent — Reverse Engineer Anything in a container, MCP-ready
 
+[![ci](https://github.com/alexmi256/rea-agent-docker/actions/workflows/build.yml/badge.svg)](https://github.com/alexmi256/rea-agent-docker/actions/workflows/build.yml)
+[![ghcr: rea-agent](https://img.shields.io/badge/ghcr.io-alexmi256%2Frea--agent-2496ED?logo=docker&logoColor=white)](https://github.com/alexmi256/rea-agent-docker/pkgs/container/rea-agent)
+
 A Docker image + Compose stack that runs **[REA](https://rea.tools/)
 (`rea-agents`, the "Reverse Engineer Anything" MCP server)** together with every
 analysis engine and helper it can drive, so an MCP client — Hermes Agent,

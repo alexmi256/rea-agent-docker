@@ -96,10 +96,12 @@ own account:
    `docker-compose.yml` / `compose.http.yml`, to your own
    `ghcr.io/<you>/...` names (the CI `validate` job fails if these, the resolver
    output and the docs disagree — that check exists to catch exactly this).
-2. Make sure the token can push packages: the `build` job declares
-   `permissions: packages: write`, which is enough unless the repository is set to
-   restrict it (**Settings → Actions → General → Workflow permissions** →
-   "Read and write permissions").
+2. The `build` job declares `permissions: packages: write`, and that alone is
+   enough even when the repository's default workflow permission is only *read* —
+   verified on this repo, whose default is `read` and whose push succeeded,
+   because an explicit `permissions:` block overrides the default. You only need
+   **Settings → Actions → General → Workflow permissions** if you *remove* that
+   block and then see `denied: permission_denied: write_package`.
 3. Keep the `org.opencontainers.image.source` label pointing at *your* repo (it is
    built from `github.server_url`/`github.repository` in CI). It is what links the
    package to the repository, and what makes the package inherit the repository's

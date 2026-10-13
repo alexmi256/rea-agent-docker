@@ -20,6 +20,14 @@ name: ci
 #   (multi-arch Ghidra analysis, Hopper analysis, live captures). Pushes run the
 #   quick profile to stay fast.
 #
+#   Publishing on every push means a docs-only commit still rebuilds and
+#   republishes all four images. That is mostly free - public repositories get
+#   free runner minutes, and GHCR skips blobs it already has, so unchanged layers
+#   upload nothing - but if you would rather not spend ~10 minutes of CI on a
+#   typo fix, add a `paths:` list to the push trigger, or split this file so that
+#   only the `validate` job runs on every commit. `validate` is the part that
+#   should always run.
+#
 # History worth keeping, because both failures were real and both were found
 # only because CI ran the image as a uid it does not know:
 #   1. "mkdir: cannot create directory '/tmp/rea/home': Permission denied" - the
