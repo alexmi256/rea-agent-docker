@@ -61,8 +61,11 @@ else
           -H 'content-type: application/json' \
           -H 'accept: application/json, text/event-stream' \
           -d '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"verify","version":"1"}}}' 2>&1)"
-        if printf '%s' "$body" | grep -qE '"result"|serverInfo|rea'; then
-            _ok "http bridge initialize"
+        # supergateway answers with a server-sent-events frame: take the data: payload
+        payload="$(printf '%s' "$body" | tr -d '\r' | sed -n 's/^data: //p' | head -1)"
+        [ -n "$payload" ] || payload="$body"
+        if printf '%s' "$payload" | grep -qE '"result".*serverInfo.*rea|serverInfo'; then
+            _ok "http bridge initialize (serverInfo over SSE)"
         else
             _bad "http bridge initialize" "unexpected body: $(printf '%s' "$body" | head -c 200)"
         fi

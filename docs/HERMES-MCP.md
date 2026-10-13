@@ -65,6 +65,29 @@ container's own loopback. A client in a different container must use the host
 gateway (e.g. `host.docker.internal`, or the `docker0` address), not
 `127.0.0.1`.
 
+Verified handshake (in-image, current build):
+
+```bash
+$ curl -sS -X POST http://127.0.0.1:8811/mcp \
+    -H 'content-type: application/json' \
+    -H 'accept: application/json, text/event-stream' \
+    -d '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+data: {"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true},
+      "completions":{},"prompts":{"listChanged":true}},
+      "serverInfo":{"name":"rea","version":"6.4.0"},"instructions":"REA provides ..."}}
+```
+
+Notes for HTTP clients:
+
+* The response is an SSE frame — parse the `data:` line, not the raw body.
+* The compose service starts the bridge with `--stateful`, so `initialize`
+  returns an `mcp-session-id` header that follow-up calls must send. Drop
+  `--stateful` (and keep one session per client) if your client cannot carry
+  that header.
+* A `-32603 "MCP server process failed"` from the bridge means the child
+  `rea mcp` exited: usually an invalid REA configuration in the container's
+  environment (see the empty-`REA_*` entry in docs/TROUBLESHOOTING.md).
+
 ## 3. Tool catalog size
 
 REA advertises ~170 tools. Schemas dominate the payload:
