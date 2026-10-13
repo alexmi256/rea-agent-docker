@@ -50,8 +50,20 @@ else
 fi
 
 section "Hopper licence/state layout"
-check "hopper application-support dir" "." \
-    -- bash -c "ls -ld \"${HOPPER_STATE_DIR:-/home/rea/.local/share/hopper}\""
+# Engine-gated like every other per-engine check: the state directory exists in
+# all four images (the Dockerfile creates it), but it only means anything on an
+# image that ships Hopper. It is also only stat-able when the container runs as a
+# uid that can traverse $HOME - running as a foreign uid is a supported mode (see
+# docs/TROUBLESHOOTING.md), so report that as a skip, not a failure.
+hopper_statedir="${HOPPER_STATE_DIR:-/home/rea/.local/share/hopper}"
+if ! engine_has hopper; then
+    _skip "hopper application-support dir" "not in this image (engine: $(image_engine))"
+elif ls -ld "$hopper_statedir" >/dev/null 2>&1; then
+    check "hopper application-support dir" "." -- bash -c "ls -ld \"$hopper_statedir\""
+else
+    _skip "hopper application-support dir" \
+        "not traversable as uid $(id -u); run with a uid matching the image user (docs/TROUBLESHOOTING.md)"
+fi
 
 section "import-export / comparison surface"
 if [ -s "$FIX/Info.plist" ]; then

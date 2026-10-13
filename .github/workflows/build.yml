@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Dockerfile syntax for every engine profile
         run: |
@@ -145,7 +145,7 @@ jobs:
       matrix:
         engine: ${{ fromJSON(needs.setup.outputs.engines) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Free disk space (each image is ~8-9 GB)
         run: |
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload verification report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: verification-report-${{ matrix.engine }}
           path: work/verify-reports
