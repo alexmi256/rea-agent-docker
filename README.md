@@ -241,6 +241,13 @@ catalog, refused ELF machine, unlicensed IDA/JEB).
   client's timeout to match (`1800` in the Hermes block).
 * **User mapping.** The image runs as uid/gid 1000 (`REA_UID`/`REA_GID`); match
   your host user so `work/` stays writable without sudo.
+* **Running from inside another container (Docker-outside-of-Docker).** The
+  Docker daemon resolves volume and build-context paths on the *host*, so if you
+  invoke `scripts/build.sh` / `scripts/verify.sh` from inside a container (e.g.
+  Hermes in Docker with the host socket mounted), tell them how to translate:
+  `HOST_PATH_MAP=<container-path>=<host-path>` in `.env`, for the Hermes layout
+  `HOST_PATH_MAP=/opt/data=/flashcache/hermes`. Empty by default, which is right
+  for a normal host and for compose.
 * **Tool-catalog size.** REA ships ~170 tools. The image defaults to
   `REA_MCP_INPUT_SCHEMA_PROFILE=compact` (~290 KB vs ~496 KB of schema per
   request); set `full` if a client needs complete nested schemas.

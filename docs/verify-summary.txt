@@ -1,8 +1,11 @@
+# NOTE: the `platform:` line in each run is redacted to 'Linux x86_64' - the
+# exact kernel/host string was removed before publishing this repo. Nothing
+# else in these summaries was altered.
 rea-agent verification
 run:       20261013T182120Z
 date:      2026-10-13T18:32:30Z
 image:     unknown
-platform:  Linux 6.14.11-9-bpo12-pve x86_64
+platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.21.0
 rea:       6.4.0
 passed:    88

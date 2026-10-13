@@ -23,7 +23,11 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST_PATH_MAP="${HOST_PATH_MAP:-/opt/data=/flashcache/hermes}"
+# Container-path -> host-path translation for Docker-outside-of-Docker (see the
+# header). Empty by default: on a normal host the paths are already host-visible
+# and nothing needs translating. Hermes-in-Docker users set it in .env, e.g.
+#   HOST_PATH_MAP=/opt/data=/flashcache/hermes
+HOST_PATH_MAP="${HOST_PATH_MAP:-}"
 IMAGE="${REA_IMAGE:-}"
 DOCKER="${DOCKER:-docker}"
 BUILD_ARGS=()

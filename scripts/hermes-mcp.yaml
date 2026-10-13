@@ -56,9 +56,9 @@ mcp_servers:
 #      - linux/amd64
 #      - --shm-size=1g
 #      - -v
-#      - /flashcache/hermes/rea/work:/work
+#      - /path/to/rea-agent-docker/work:/work
 #      - -v
-#      - /flashcache/hermes/rea/targets:/targets:ro
+#      - /path/to/rea-agent-docker/targets:/targets:ro
 #      - -w
 #      - /work
 #      - rea-agent-ghidra:6.4.0-linux-amd64

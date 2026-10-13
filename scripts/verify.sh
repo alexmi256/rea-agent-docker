@@ -11,12 +11,24 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST_PATH_MAP="${HOST_PATH_MAP:-/opt/data=/flashcache/hermes}"
+# Container-path -> host-path translation for Docker-outside-of-Docker: when this
+# script runs inside a container that talks to the host Docker daemon, volume
+# sources resolve on the *host*. Empty by default (nothing to translate on a
+# normal host); Hermes-in-Docker users set it in .env, e.g.
+#   HOST_PATH_MAP=/opt/data=/flashcache/hermes
+HOST_PATH_MAP="${HOST_PATH_MAP:-}"
 IMAGE="${REA_IMAGE:-rea-agent:6.4.0-linux-amd64}"
 DOCKER="${DOCKER:-docker}"
 COMPOSE=0
 SERVICE="${REA_SERVICE:-rea-agent}"
 ARGS=()
+
+if [ -f "$PROJECT_DIR/.env" ]; then
+    # .env supplies REA_UID/REA_GID, REA_IMAGE, HOST_PATH_MAP and friends. It is
+    # gitignored, so host-specific values live there and never in the repo.
+    # shellcheck disable=SC1091
+    . "$PROJECT_DIR/.env"
+fi
 
 while [ $# -gt 0 ]; do
     case "$1" in
