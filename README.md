@@ -279,5 +279,8 @@ catalog, refused ELF machine, unlicensed IDA/JEB).
 
 The files in this repository are yours to use under the MIT licence (see
 `LICENSE`). Every third-party tool inside the image keeps its own licence and
-terms; two of them (IDA, JEB) are commercial and must be licensed by you, and a
-third (Hopper) is commercial with a redistributable demo. REA itself is MIT.
+terms — the full list, plus the components that are deliberately absent, is in
+[`docs/THIRD-PARTY-NOTICES.md`](docs/THIRD-PARTY-NOTICES.md). Two of them (IDA,
+JEB) are commercial and must be licensed by you; a third (Hopper) is commercial
+with a redistributable demo, and only that demo is ever downloaded here. REA
+itself is MIT.

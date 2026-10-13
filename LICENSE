@@ -19,23 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This licence covers only the files in this repository (Dockerfile, compose
-files, scripts, documentation). The image it builds installs third-party
-software that keeps its own licence and terms, including:
-
-* Ghidra (Apache-2.0), OpenJDK (GPL-2.0-with-classpath-exception), Node.js (MIT),
-  REA rea-agents (MIT), Qt6 (LGPL-3.0), Hopper (commercial, public demo
-  redistributed here as downloaded from the vendor), WABT (Apache-2.0),
-  Apktool (Apache-2.0), jadx-headless-mcp (Apache-2.0), .NET SDK (MIT),
-  ILSpy/ilspycmd (MIT), pwntools (MIT), pyelftools/public-domain, Unicorn
-  (GPL-2.0), pwndbg (MIT), unblob (MIT), mitmproxy (MIT), Wireshark/tshark
-  (GPL-2.0), sigrok-cli (GPL-3.0), Android platform-tools (Apache-2.0),
-  binwalk (MIT), wine (LGPL-2.1), Frida (wxWindows/LGPL), supergateway (MIT),
-  uv (Apache-2.0/MIT), Google Chrome (proprietary, redistributed as downloaded).
-
-IDA Pro/IDA Home/IDA Free and JEB are **not** included and must be obtained and
-licensed separately by the operator. Redistributing IDA is not permitted by its
-licence; keep any image that contains it private.
