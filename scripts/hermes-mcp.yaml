@@ -4,26 +4,32 @@
 # (`hermes restart`, or exit and relaunch). Tools appear as mcp_rea_<tool>,
 # e.g. mcp_rea_open_binary, mcp_rea_analyze_function.
 #
-# Prerequisite: the container is up.
-#   cd <this project> && docker compose up -d rea-agent
+# Prerequisite: the container is up. Pick the engine you built - the container
+# name is the only thing that changes between them (docs/IMAGES.md):
+#   docker compose up -d                                # rea-agent (Ghidra+Hopper)
+#   docker compose --profile ghidra up -d rea-ghidra    # or: make up ENGINE=ghidra
+#   docker compose --profile hopper up -d rea-hopper
+#   docker compose --profile ida    up -d rea-ida       # bring your own IDA
 #
 # Verify from a shell first:
-#   docker exec -i rea-agent rea mcp </dev/null   # exits cleanly, prints nothing
+#   docker exec -i rea-agent-ghidra rea mcp </dev/null   # exits cleanly, no output
 
 mcp_servers:
   # --- primary: stdio through `docker exec` into the long-lived service ------
   # No networking required, no HTTP surface, no extra port: Hermes spawns
-  # `docker exec -i rea-agent rea mcp` and speaks MCP over its stdin/stdout.
+  # `docker exec -i <container> rea mcp` and speaks MCP over its stdin/stdout.
   rea:
     command: "docker"
-    args: ["exec", "-i", "rea-agent", "rea", "mcp"]
+    args: ["exec", "-i", "rea-agent-ghidra", "rea", "mcp"]   # rea-agent | rea-agent-hopper | rea-agent-ida
     # Ghidra's first query on a large target imports + auto-analyses it. REA's
     # own provider deadline is REA_GHIDRA_STARTUP_TIMEOUT_MS (900 s in
     # docker-compose.yml), so the client timeout must be at least as long.
     timeout: 1800
     connect_timeout: 120
     env:
-      # Only needed if you want the container to pick a standing provider:
+      # Only needed if you want the container to pick a standing provider. The
+      # single-engine images already set this inside the image
+      # (/usr/local/share/rea/engine.env), so it is usually redundant here.
       # REA_ANALYSIS_PROVIDER: "ghidra"
       #
       # REA advertises ~170 tools. `compact` (the image default) trims the
@@ -36,7 +42,8 @@ mcp_servers:
 
 # --- optional second registration: ephemeral container per session -----------
 # Useful when you do not want a long-lived service (cold Ghidra/Hopper caches
-# each session, ~2-3 s extra, but nothing keeps running between tasks).
+# each session, ~2-3 s extra, but nothing keeps running between tasks). Swap the
+# image for the engine you built: rea-agent-ghidra / -hopper / -ida.
 # Uncomment and drop the `rea` entry above if you prefer this shape.
 #
 #  rea-ephemeral:
@@ -54,7 +61,7 @@ mcp_servers:
 #      - /flashcache/hermes/rea/targets:/targets:ro
 #      - -w
 #      - /work
-#      - rea-agent:6.4.0-linux-amd64
+#      - rea-agent-ghidra:6.4.0-linux-amd64
 #      - rea
 #      - mcp
 #    timeout: 1800

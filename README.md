@@ -23,7 +23,9 @@ engineering without installing a single tool on the host.
 * **Verified:** the image ships a harness that actually runs the engines —
   `scripts/verify.sh` builds fixtures for eight architectures/format families
   and analyses them through the providers, then does a real MCP handshake. It is
-  engine-aware, so the same harness verifies all four images.
+  engine-aware, so the same harness verifies all four images; the recorded
+  per-engine sweep is **96/85/79/72 passed, 0 failed** (all/ghidra/hopper/ida,
+  [docs/VERIFICATION.md](docs/VERIFICATION.md)).
 
 ---
 
@@ -220,9 +222,13 @@ stdout/stderr per check in `logs/`, so a failure is always inspectable.
 
 ### Latest result on this machine
 
-See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) — a recorded run with the
-exact commands and the pass/fail table, including the checks that are expected
-to be skipped without a licence (IDA `idalib`, JEB).
+See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) — the recorded per-engine
+sweep with the exact commands and pass/fail/skip tables, and
+[`docs/verify-engines.txt`](verify-engines.txt) for the raw per-engine summaries.
+Final sweep (full harness, one run per image): `all` 96 passed / 0 failed / 14
+skipped, `ghidra` 85/0/18, `hopper` 79/0/16, `ida` 72/0/19 — every image
+exited 0, and every skip is conditional (engine absent from that image, release
+catalog, refused ELF machine, unlicensed IDA/JEB).
 
 ---
 

@@ -30,8 +30,16 @@ section "container healthcheck"
 # The same script Docker runs as HEALTHCHECK: it must call THIS image healthy, and
 # must not demand an engine the image does not carry.
 check "healthcheck reports healthy" "^healthy:" -- /usr/local/bin/rea-agent-healthcheck
-check "healthcheck (deep) reports healthy" "^healthy:" \
-    -- bash -c 'REA_HEALTHCHECK_DEEP=1 /usr/local/bin/rea-agent-healthcheck'
+if [ "$(image_engine)" = "ida" ] && [ -z "${REA_IDA_MCP_CONFIG:-}" ]; then
+    # Correct behaviour, asserted positively: with no engine and no registration,
+    # the *deep* healthcheck says exactly that instead of claiming health.
+    check "healthcheck (deep) names the missing IDA registration" \
+        "REA_IDA_MCP_CONFIG is not set" \
+        -- bash -c 'REA_HEALTHCHECK_DEEP=1 /usr/local/bin/rea-agent-healthcheck 2>&1; true'
+else
+    check "healthcheck (deep) reports healthy" "^healthy:" \
+        -- bash -c 'REA_HEALTHCHECK_DEEP=1 /usr/local/bin/rea-agent-healthcheck'
+fi
 
 section "analysis engines"
 check "java runtime"        "openjdk|java"             -- bash -c "java -version 2>&1 | head -1"
