@@ -613,7 +613,12 @@ RUN chmod 0755 /usr/local/bin/rea-agent-entrypoint \
 USER ${REA_USER}
 WORKDIR /work
 ENV HOME=/home/${REA_USER}
-RUN mkdir -p "${TMPDIR}"
+# The scratch dir must be usable by *any* uid: compose/`docker run` may start the
+# container as a different user than the image's, and the entrypoint's
+# writable-HOME fallback lives here. 1777 (like /tmp) is the conventional mode -
+# users can only remove their own files - and it is what lets a foreign uid still
+# reach "ready" instead of dying on mkdir.
+RUN mkdir -p "${TMPDIR}" && chmod 1777 "${TMPDIR}"
 
 EXPOSE 8811
 HEALTHCHECK --interval=60s --timeout=90s --start-period=120s --retries=3 \

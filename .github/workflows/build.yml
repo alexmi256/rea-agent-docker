@@ -10,14 +10,18 @@ name: ci
 #
 #   build    - the real thing: builds an engine image and runs the in-image
 #              verification harness (engine-aware, so one harness verifies every
-#              image). MANUAL ONLY, because each image is ~8-9 GB: a
-#              GitHub-hosted runner usually cannot hold the image plus build
-#              cache plus intermediate layers, and a runner that exhausts its
-#              disk is killed mid-build with NO step-level records - which is
-#              exactly how the first attempt at this workflow failed (log ended
-#              mid-instruction, empty steps array). For a hosted CI run, trim the
-#              image with the INSTALL_* build args or use a self-hosted runner
-#              with >= 30 GB free.
+#              image). MANUAL ONLY to keep pushes fast: a hosted runner *does*
+#              fit it (observed with 102 GB free, ~6 min for the Ghidra image),
+#              but it is several minutes and a few GB of bandwidth per push.
+#              Set `full` to build all four images and run the whole harness.
+#
+#              History worth keeping: the first push-triggered attempt failed in
+#              the verification step, not the build, with
+#              "mkdir: cannot create directory '/tmp/rea/home': Permission
+#              denied" - the container was started as the runner's uid, and the
+#              image's scratch dir was only writable by its own user. The
+#              entrypoint's HOME fallback is now resilient and the scratch dir is
+#              1777, and the step below exists to keep that true.
 on:
   push:
     branches: [main]
@@ -165,6 +169,21 @@ jobs:
             --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^REA_ENGINE='
           docker run --rm "rea-agent-${{ matrix.engine }}:ci" \
             bash -c 'echo "engine: $(cat /usr/local/share/rea/engine)"; cat /usr/local/share/rea/engine.env; rea --version'
+
+      - name: Runs as an arbitrary uid (a foreign uid must not break the entrypoint)
+        run: |
+          # compose `user:` and CI itself start the container as a uid the image
+          # does not know. The entrypoint must still reach "ready" through its
+          # HOME fallback instead of dying on mkdir - this exact bug failed the
+          # first CI attempt ("mkdir: cannot create directory '/tmp/rea/home'").
+          out="$(docker run --rm --user 12345:12345 "rea-agent-${{ matrix.engine }}:ci" \
+                   bash -c 'echo "home=$HOME"; rea --version' 2>&1)"
+          printf '%s\n' "$out"
+          printf '%s' "$out" | grep -qE '^6\.' || { echo "rea --version failed as uid 12345"; exit 1; }
+          if printf '%s' "$out" | grep -q 'Permission denied'; then
+            echo "entrypoint hit a permission error as a foreign uid"; exit 1
+          fi
+          echo "foreign uid ok"
 
       - name: Quick verification (tools + static analysis + MCP handshake)
         run: |

@@ -28,15 +28,31 @@ done
 
 # --- 2. writable runtime dirs (bind mounts may arrive host-owned) ------------
 # A named volume over /home/<user> is initialised with the *build-time* uid; if
-# the container is later started as a different uid (compose `user:`), HOME is
-# not writable and REA's cache/state writes would fail. Fall back loudly.
+# the container is later started as a different uid (compose `user:`, or CI
+# running as the runner user), HOME is not writable and REA's cache/state writes
+# would fail. Fall back loudly - and never die here: a container that cannot
+# write its home is still able to run read-only work, and refusing to start
+# hides the actual problem behind an entrypoint failure.
 if ! mkdir -p "${HOME:-/home/rea}/.rea" 2>/dev/null; then
-    fallback="${REA_HOME_FALLBACK:-${TMPDIR:-/tmp/rea}/home}"
-    mkdir -p "$fallback"
-    log "warning: \$HOME=${HOME:-unset} is not writable; using $fallback instead."
-    log "warning: fix by rebuilding with REA_UID/REA_GID matching your user, or run:"
-    log "warning:   docker compose exec -u 0 rea-agent chown -R \$(id -u):\$(id -g) /home/rea"
-    export HOME="$fallback"
+    fallback=""
+    for candidate in "${REA_HOME_FALLBACK:-}" "${TMPDIR:-/tmp/rea}/home"; do
+        [ -n "$candidate" ] || continue
+        if mkdir -p "$candidate" 2>/dev/null; then fallback="$candidate"; break; fi
+    done
+    if [ -z "$fallback" ]; then
+        fallback="$(mktemp -d 2>/dev/null || true)"
+    fi
+    if [ -n "$fallback" ]; then
+        chmod 700 "$fallback" 2>/dev/null || true
+        log "warning: \$HOME=${HOME:-unset} is not writable; using $fallback instead."
+        log "warning: fix by rebuilding with REA_UID/REA_GID matching your user, or run:"
+        log "warning:   docker compose exec -u 0 rea-agent chown -R \$(id -u):\$(id -g) /home/rea"
+        export HOME="$fallback"
+    else
+        log "warning: \$HOME=${HOME:-unset} is not writable and no fallback could be created;"
+        log "warning: continuing, but REA may fail to write its cache/state."
+        log "warning: run with a matching uid (\$(id -u):\$(id -g)) or as \`-u 0\`."
+    fi
 fi
 mkdir -p "${TMPDIR:-/tmp/rea}" /var/log/rea 2>/dev/null || true
 

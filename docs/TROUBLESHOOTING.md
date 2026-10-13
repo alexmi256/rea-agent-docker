@@ -222,6 +222,15 @@ reuses an existing group and renames that stock user to `rea` when the requested
 uid is taken. If you maintain your own copy of the Dockerfile, do the same, or
 build with `REA_UID`/`REA_GID` set to free ids (`id -u` / `id -g`).
 
+**`mkdir: cannot create directory '/tmp/rea/home': Permission denied`**
+The container was started as a uid the image does not know (compose `user:`, CI,
+`docker run -u 1001`), so `$HOME` is not writable and the entrypoint fell back to
+`/tmp/rea/home`. Fixed in the image: the scratch dir is mode 1777 and the fallback
+now tries `$REA_HOME_FALLBACK`, then `/tmp/rea/home`, then a `mktemp -d`, and
+continues with a warning instead of aborting. If you see the warning, either build
+with `REA_UID`/`REA_GID` matching your user (`id -u`/`id -g`) or fix the volume's
+ownership once: `docker compose exec -u 0 rea-agent chown -R $(id -u):$(id -g) /home/rea`.
+
 **A `--profile <engine> up -d` starts two containers**
 By design: a compose service without a profile always starts, so
 `--profile ghidra up -d` also starts the default `rea-agent`. Name the service
