@@ -307,7 +307,7 @@ if command -v dotnet >/dev/null 2>&1; then
         mkdir -p "$dotnet_dir"
         (
             cd "$dotnet_dir" || exit 1
-            dotnet new classlib -o . --force 2>&1 | tail -3
+            dotnet new classlib -n VerifyLib -o . --force 2>&1 | tail -3
             cat >License.cs <<'EOF'
 namespace VerifyLib;
 public sealed class License {

@@ -1,23 +1,18 @@
 rea-agent verification
-run:       20261013T171348Z
-date:      2026-10-13T17:24:54Z
+run:       20261013T182120Z
+date:      2026-10-13T18:32:30Z
 image:     unknown
 platform:  Linux 6.14.11-9-bpo12-pve x86_64
 node:      v24.21.0
 rea:       6.4.0
-passed:    82
-failed:    3
+passed:    88
+failed:    0
 skipped:   14
-
-failed checks:
-  - inspect-artifact on an application directory
-  - inspect-artifact on an archive-like file
-  - plist decode
 
 skipped checks:
   - ghidra search linux-riscv64
   - ghidra search linux-powerpc
-  - managed artifact
+  - plist decode
   - sqlite schema + row sample
   - wasm artifact: imports/exports and WAT
   - go-binary metadata probe
@@ -30,30 +25,30 @@ skipped checks:
   - ida doctor
   - jeb client
 
-Post-run triage of the three failures in this run (image 17a40de7, harness
-before commit 69f94d5) - all three were fixture choices, not image defects:
+Interpretation of the 14 skips (all conditional, none an image defect):
 
-  inspect-artifact on an application directory -> REA: "open_binary accepts
-      files and macOS app bundles. This target is a directory; JavaScript/
-      Electron application directories can be analyzed directly with
-      analyze_javascript_application or `rea analyze <directory>`".
-      Harness now uses `rea analyze <dir>` for directory routing and
-      inspect-artifact/extract-artifact on a real zip bundle.
-  inspect-artifact on an archive-like file (session.har) -> "unsupported binary
-      format": HAR is a JSON capture, routed through
-      inspect-web-network-capture (which passes), not the artifact path.
-      Replaced by the zip-bundle checks.
-  plist decode -> capability_unavailable: REA routes plists through its Apple
-      composite provider, unavailable for this input on Linux. Now an explicit
-      skip with that reason.
+  ghidra search linux-riscv64 / linux-powerpc
+      REA 6.4.0's artifact admission refuses those ELF e_machine values
+      ("unsupported ELF architecture"). Ghidra itself analysed x86-64, AArch64,
+      ARMv7, MIPS32 BE/LE and PE32+ in the same run.
+  plist decode
+      REA routes plists through its Apple-platform composite provider, which is
+      unavailable for this input on Linux (capability_unavailable).
+  sqlite / wasm / go-binary / pcap x3 / sigrok x2 / frida
+      Command families that exist on REA's repository main but not in the 6.4.0
+      npm release. Their tooling (WABT, SQLite, tshark, sigrok-cli, frida) is
+      installed and checked directly, so a later REA_VERSION gains them.
+  ida doctor / jeb client
+      Bring-your-own commercial engines; skipped because no registration was
+      configured for this run.
 
-Also fixed after this run: the .NET fixture build is no longer silent
-(fixtures.log records dotnet's output), so a failure there is diagnosable.
-
-Everything else passed, including: Ghidra x86-64 analysis/function/decompile/
-instructions, AArch64 + ARMv7 + MIPS32 BE/LE + PE32+ import+search, AArch64 and
-MIPS32 decompilation, Hopper demo-mode analysis/decompile/search, firmware
-regions + extraction, HAR + live mitmdump capture, Chrome CDP target/page/
-screenshot, Playwright scenario, PTY process capture, adb/apktool/JADX, frida
-binding, MCP stdio handshake + tools/call + Ghidra open_binary/analyze_function,
-and MCP over Streamable HTTP.
+Verified in this run: Ghidra analyze/function/decompile/instructions (x86-64),
+import+search across AArch64/ARMv7/MIPS32 BE+LE/PE32+, AArch64 and MIPS32
+decompilation, Hopper demo-mode analyze/decompile/search, ELF layout (pwntools),
+managed artifact + members + a real ilspycmd decompilation, EVM selectors,
+JS/Electron application graph + evidence->view round trip, historical source
+import, firmware regions + extraction, HAR + live mitmdump capture, Chrome CDP
+target/page/screenshot, Playwright launch->click->DOM, PTY process capture,
+adb/apktool/JADX, frida binding, MCP stdio handshake (170 tools) + engine-free
+tools/call + Ghidra open_binary/analyze_function/close_binary, and the
+Streamable HTTP bridge.

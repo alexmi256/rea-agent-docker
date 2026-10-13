@@ -64,8 +64,8 @@ those checks.
 | Run | Result |
 | --- | ------ |
 | `20261013T165832Z` (quick) | 47 passed / 8 failed / 6 skipped — produced the diagnosis below |
-| `20261013T170107Z` (first full) | 47+ passed; every failure was a harness/fixture defect since fixed: missing `check_rea` command argument, `grep -c` exit status, `binary_overview` string assertions, `file://` browser targets, missing Playwright `executable_path`, and the MCP probe choosing a tool that errors on a directory |
-| `20261013T171348Z` (after the fixes) | Ghidra x86-64 analysis, AArch64/ARMv7/MIPS32/PE32+ search and the Hopper trio verified clean; see `work/verify-reports/<run>/summary.txt` |
+| `20261013T170107Z` (first full) | 82 passed / 3 failed / 14 skipped; every failure was a harness/fixture defect since fixed: missing `check_rea` command argument, `grep -c` exit status, `binary_overview` string assertions, `file://` browser targets, missing Playwright `executable_path`, and the MCP probe choosing a tool that errors on a directory |
+| **`20261013T182120Z` (final full)** | **88 passed / 0 failed / 14 skipped, exit 0** — clean; the 14 skips are all conditional (release catalog, refused ELF machines, Apple-provider routing, unlicensed IDA/JEB). Checked in at [`docs/verify-summary.txt`](verify-summary.txt) |
 
 Machine-checked facts that hold independently of the harness:
 

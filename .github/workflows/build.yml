@@ -40,13 +40,31 @@ jobs:
         run: |
           mkdir -p work config
           docker run --rm --shm-size=1g \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
             rea-agent:ci /opt/rea/verify/verify-all.sh --quick
+
+      - name: Publish verification summary
+        if: always()
+        run: |
+          latest="$(ls -td work/verify-reports/*/ 2>/dev/null | head -1 || true)"
+          if [ -n "$latest" ] && [ -f "${latest}summary.txt" ]; then
+            {
+              echo "## rea-agent verification"
+              echo
+              echo '```'
+              cat "${latest}summary.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No verification summary was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Full verification (Ghidra multi-arch + Hopper + HTTP bridge)
         if: github.event_name == 'workflow_dispatch' && inputs.full
         run: |
           docker run --rm --shm-size=4g \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
             rea-agent:ci /opt/rea/verify/verify-all.sh
 
@@ -57,3 +75,9 @@ jobs:
           name: verification-report
           path: work/verify-reports
           if-no-files-found: ignore
+
+      - name: Harness log
+        if: always()
+        run: |
+          latest="$(ls -td work/verify-reports/*/ 2>/dev/null | head -1 || true)"
+          [ -n "$latest" ] && tail -60 "${latest}summary.txt" || true
