@@ -294,6 +294,12 @@ cat >"$FIX/browser-scenario.json" <<EOF
 EOF
 echo "  + process-scenario.json, browser-scenario.json"
 
+# --- a real archive for inspect-artifact / extract-artifact -------------------
+if command -v zip >/dev/null 2>&1 && [ -d "$FIX/jsapp" ]; then
+    ( cd "$FIX" && rm -f bundle.zip && zip -qr bundle.zip jsapp ) >/dev/null 2>&1 \
+        && echo "  + bundle.zip"
+fi
+
 # --- .NET assembly (managed analysis / ilspycmd) ------------------------------
 if command -v dotnet >/dev/null 2>&1; then
     dotnet_dir="$FIX/dotnet-app"
@@ -301,7 +307,7 @@ if command -v dotnet >/dev/null 2>&1; then
         mkdir -p "$dotnet_dir"
         (
             cd "$dotnet_dir" || exit 1
-            dotnet new classlib -o . --force >/dev/null 2>&1
+            dotnet new classlib -o . --force 2>&1 | tail -3
             cat >License.cs <<'EOF'
 namespace VerifyLib;
 public sealed class License {
@@ -311,11 +317,13 @@ public sealed class License {
 }
 EOF
             rm -f Class1.cs
-            dotnet build -c Release -v quiet >/dev/null 2>&1
-        )
+            dotnet build -c Release 2>&1 | tail -5
+        ) 2>&1 | sed 's/^/  dotnet: /'
     fi
     if [ -f "$dotnet_dir/bin/Release/net8.0/VerifyLib.dll" ]; then
         echo "  + dotnet-app/bin/Release/net8.0/VerifyLib.dll"
+    else
+        echo "  - .NET fixture not built (see the dotnet: lines above)"
     fi
 fi
 

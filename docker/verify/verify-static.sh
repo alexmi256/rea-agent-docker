@@ -12,6 +12,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib.sh"
 
 FIX="$REA_VERIFY_FIXTURES"
+WORK_ARTIFACT="$(mktemp -d "${TMPDIR:-/tmp}/rea-verify-artifact.XXXXXX")"
 
 section "ELF layout (pwntools 4.15.0)"
 if [ -s "$FIX/fixture-x86_64.elf" ]; then
@@ -22,19 +23,23 @@ else
 fi
 
 section "artifact inspection"
-if [ -d "$FIX/jsapp" ]; then
-    check_rea "inspect-artifact on an application directory" inspect-artifact "package.json|src|jsapp|artifact" \
-        -- "$FIX/jsapp" --json
+# A directory is not an open_binary target: REA routes JS/Electron directories
+# through analyze rather than the native/artifact path, and only files/bundles
+# through inspect-artifact.
+if [ -d "$FIX/jsapp/src" ]; then
+    check_rea "rea analyze on an application directory" analyze "." -- "$FIX/jsapp" --json
 fi
-if [ -s "$FIX/session.har" ]; then
-    check_rea "inspect-artifact on an archive-like file" inspect-artifact "." -- "$FIX/session.har" --json
+if [ -s "$FIX/bundle.zip" ]; then
+    check_rea "inspect-artifact on a zip bundle" inspect-artifact "." -- "$FIX/bundle.zip" --json
+    check_rea "extract-artifact on a zip bundle" extract-artifact "." -- "$FIX/bundle.zip" "$WORK_ARTIFACT" --json
 fi
 
-section "Apple static formats"
+section "Apple static formats (platform-scoped in REA)"
+# REA routes plists through its Apple-platform composite provider, which is not
+# available for this input on Linux: it reports capability_unavailable rather
+# than guessing. Recorded as a skip with the reason, not a failure.
 if [ -s "$FIX/Info.plist" ]; then
-    check_rea "plist decode" inspect-plist "CFBundleIdentifier|tools.rea.verify" -- "$FIX/Info.plist" --json
-else
-    _skip "plist" "fixture missing"
+    _skip "plist decode" "REA routes plists through the Apple composite provider (unavailable on Linux for this input)"
 fi
 
 section "managed code (.NET / ilspycmd)"

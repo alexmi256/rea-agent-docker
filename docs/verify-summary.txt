@@ -1,46 +1,22 @@
-rea-agent verification summary (partial run, captured mid-flight)
-run: work/verify-reports/20261013T171348Z/
-date: 2026-10-13T17:21:05Z
-
-== machine-checked facts ==
-- rea doctor --provider ghidra --json        -> healthy: true (Ghidra 12.1.4, native decompiler elf x86_64, JDK 21 64-bit)
-- rea doctor --provider hopper --json        -> healthy: true (hopper-version + hopper-demo-runtime healthy)
-- Hopper launcher sha256                     -> 0294ced141cc373468ee22d8343e7dac41980cb05a937994ca81c9f09afe7ded (in REA's supported set)
-- rea mcp initialize                         -> server rea 6.4.0, protocol 2025-06-18, tools/completions/prompts
-- rea mcp tools/list                         -> 170 tools
-- Ghidra analysis (this run)                 -> linux-x86_64 ok; aarch64/armv7/mips32-be/pe32+ search ok; riscv64+powerpc refused: unsupported ELF architecture
-- Hopper analysis (this run)                 -> analyze + decompile + string search returned Evidence (demo mode, private Xvfb)
-- ilspycmd 8.2.0.7535                        -> runs (DOTNET_ROLL_FORWARD=Major)
-- frida binding                              -> getLocalDevice() = Local System
-
-== last complete run (20261013T170107Z) ==
 rea-agent verification
-run:       20261013T170107Z
-date:      2026-10-13T17:12:02Z
+run:       20261013T171348Z
+date:      2026-10-13T17:24:54Z
 image:     unknown
 platform:  Linux 6.14.11-9-bpo12-pve x86_64
 node:      v24.21.0
 rea:       6.4.0
-passed:    71
-failed:    10
-skipped:   15
+passed:    82
+failed:    3
+skipped:   14
 
 failed checks:
-  - hopper shared libraries resolve (0 = none missing)
-  - ghidra analyze linux-x86_64
-  - ghidra search linux-riscv64 finds fixture string
-  - ghidra search linux-powerpc finds fixture string
-  - ghidra instructions at entry
-  - hopper analyze x86_64
-  - browser page capture (DOM/scripts)
-  - browser screenshot capture
-  - playwright launch + click + DOM capture
-  - mcp initialize/tools handshake
-
-skipped checks:
   - inspect-artifact on an application directory
   - inspect-artifact on an archive-like file
   - plist decode
+
+skipped checks:
+  - ghidra search linux-riscv64
+  - ghidra search linux-powerpc
   - managed artifact
   - sqlite schema + row sample
   - wasm artifact: imports/exports and WAT
@@ -53,3 +29,31 @@ skipped checks:
   - rea frida commands
   - ida doctor
   - jeb client
+
+Post-run triage of the three failures in this run (image 17a40de7, harness
+before commit 69f94d5) - all three were fixture choices, not image defects:
+
+  inspect-artifact on an application directory -> REA: "open_binary accepts
+      files and macOS app bundles. This target is a directory; JavaScript/
+      Electron application directories can be analyzed directly with
+      analyze_javascript_application or `rea analyze <directory>`".
+      Harness now uses `rea analyze <dir>` for directory routing and
+      inspect-artifact/extract-artifact on a real zip bundle.
+  inspect-artifact on an archive-like file (session.har) -> "unsupported binary
+      format": HAR is a JSON capture, routed through
+      inspect-web-network-capture (which passes), not the artifact path.
+      Replaced by the zip-bundle checks.
+  plist decode -> capability_unavailable: REA routes plists through its Apple
+      composite provider, unavailable for this input on Linux. Now an explicit
+      skip with that reason.
+
+Also fixed after this run: the .NET fixture build is no longer silent
+(fixtures.log records dotnet's output), so a failure there is diagnosable.
+
+Everything else passed, including: Ghidra x86-64 analysis/function/decompile/
+instructions, AArch64 + ARMv7 + MIPS32 BE/LE + PE32+ import+search, AArch64 and
+MIPS32 decompilation, Hopper demo-mode analysis/decompile/search, firmware
+regions + extraction, HAR + live mitmdump capture, Chrome CDP target/page/
+screenshot, Playwright scenario, PTY process capture, adb/apktool/JADX, frida
+binding, MCP stdio handshake + tools/call + Ghidra open_binary/analyze_function,
+and MCP over Streamable HTTP.
