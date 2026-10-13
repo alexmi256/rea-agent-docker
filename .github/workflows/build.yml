@@ -1,30 +1,34 @@
 name: ci
 
-# Two jobs, on purpose:
+# Three jobs:
 #
 #   validate - fast, always runs (push / PR / dispatch). Checks the Dockerfile
-#              for every engine profile, every compose combination, the syntax of
-#              the scripts and YAML, and that the engine gating is still wired
-#              through the harness and healthcheck. Seconds to run, no image
-#              build. This is the check that should be green on a push.
+#              for every engine profile, every compose combination, script and
+#              YAML syntax, and that the engine gating is still wired through the
+#              harness and healthcheck. Seconds, no image build.
 #
-#   build    - the real thing: builds an engine image and runs the in-image
-#              verification harness (engine-aware, so one harness verifies every
-#              image). MANUAL ONLY to keep pushes fast: a hosted runner *does*
-#              fit it (observed with 102 GB free, ~6 min for the Ghidra image),
-#              but it is several minutes and a few GB of bandwidth per push.
-#              Set `full` to build all four images and run the whole harness.
+#   build    - builds all four engine images, runs the in-image verification
+#              harness on each (engine-aware, so one harness verifies every
+#              image), and PUBLISHES them to the GitHub Container Registry as
+#              ghcr.io/<owner>/rea-agent[-ghidra|-hopper|-ida].
+#              Runs on push to main and on manual dispatch; skipped for PRs
+#              (a fork's token cannot push packages).
+#              Pushing only happens after verification passes - a failing
+#              harness never reaches the registry.
 #
-#              History worth keeping, because both failures were real and both
-#              were found only because CI ran the image as a uid it does not
-#              know:
-#               1. "mkdir: cannot create directory '/tmp/rea/home': Permission
-#                  denied" - the entrypoint's HOME fallback died because the
-#                  scratch dir was only writable by the image's own user.
-#               2. "hopper application-support dir" failed on the Ghidra image -
-#                  the check was not engine-gated, and it stat'ed a path under
-#                  a 0750 $HOME that a foreign uid cannot traverse.
-#              Both are fixed, and the steps below keep them fixed.
+#   Dispatch inputs: `full` runs the whole harness instead of the quick profile
+#   (multi-arch Ghidra analysis, Hopper analysis, live captures). Pushes run the
+#   quick profile to stay fast.
+#
+# History worth keeping, because both failures were real and both were found
+# only because CI ran the image as a uid it does not know:
+#   1. "mkdir: cannot create directory '/tmp/rea/home': Permission denied" - the
+#      entrypoint's HOME fallback died because the scratch dir was only writable
+#      by the image's own user.
+#   2. "hopper application-support dir" failed on the Ghidra image - the check
+#      was not engine-gated, and it stat'ed a path under a 0750 $HOME that a
+#      foreign uid cannot traverse.
+# Both are fixed, and the steps below keep them fixed.
 on:
   push:
     branches: [main]
@@ -32,7 +36,7 @@ on:
   workflow_dispatch:
     inputs:
       full:
-        description: "Build all four engine images and run the full harness (needs a runner with >= 30 GB free)"
+        description: "Run the full harness (Ghidra multi-arch + Hopper analysis + live captures) before publishing"
         type: boolean
         default: false
 
@@ -65,6 +69,49 @@ jobs:
             docker compose --profile ida \
               -f docker-compose.yml -f compose.http.yml -f compose.ida.yml config --quiet
           echo "compose: default, three profiles and ida+http+ida-overlay all valid"
+
+      - name: Published image names match the compose defaults
+        run: |
+          set -e
+          # compose pulls from GHCR by default, so the names CI publishes must be
+          # exactly the names compose asks for, and the shared resolver must agree
+          # with both. Drift here means `docker compose pull` silently gets a
+          # stale or wrong image.
+          #
+          # Validate against the documented default configuration: a fresh clone
+          # has no .env, and .env.example is what both quick-start paths tell you
+          # to copy, so that is the configuration to check.
+          cp .env.example .env
+          owner="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          for pair in "rea-agent:all" "rea-agent-ghidra:ghidra" \
+                      "rea-agent-hopper:hopper" "rea-agent-ida:ida"; do
+            image="${pair%%:*}"; engine="${pair##*:}"
+            grep -q "ghcr.io/${owner}/${image}:" docker-compose.yml \
+              || { echo "compose does not reference ghcr.io/${owner}/${image}"; exit 1; }
+            resolved="$(scripts/image-name.sh "$engine")"
+            case "$resolved" in
+              "ghcr.io/${owner}/${image}:"*) ;;
+              *) echo "image-name.sh $engine resolved to '$resolved', expected ghcr.io/${owner}/${image}:*"; exit 1 ;;
+            esac
+            printf '%-20s engine=%-7s resolved=%-52s ok\n' "$image" "$engine" "$resolved"
+          done
+          grep -q "ghcr.io" README.md || { echo "README has no GHCR usage example"; exit 1; }
+          grep -q "ghcr.io" docs/IMAGES.md || { echo "docs/IMAGES.md has no GHCR example"; exit 1; }
+          grep -q "ghcr.io" .env.example || { echo ".env.example has no GHCR default"; exit 1; }
+          echo "publish names, compose defaults, resolver and docs agree"
+
+      - name: Published tag matches the Dockerfile
+        run: |
+          set -e
+          # The publish step derives its tag from the Dockerfile; make sure the
+          # compose defaults and .env.example carry the same tag, or a pull would
+          # ask for a tag CI never publishes.
+          rea_version="$(grep -m1 '^ARG REA_VERSION=' Dockerfile | cut -d= -f2)"
+          suffix="${rea_version}-linux-amd64"
+          for f in docker-compose.yml .env.example; do
+            grep -q ":${suffix}" "$f" || { echo "$f does not use tag ${suffix}"; exit 1; }
+            echo "$f uses ${suffix}"
+          done
 
       - name: Shell syntax
         run: |
@@ -124,31 +171,37 @@ jobs:
           scripts/build-all.sh --help >/dev/null
           echo "build/up/verify entry points ok"
 
-  setup:
-    runs-on: ubuntu-24.04
-    if: github.event_name == 'workflow_dispatch'
-    outputs:
-      engines: ${{ steps.pick.outputs.engines }}
-    steps:
-      - id: pick
-        run: |
-          if [ "${{ inputs.full }}" = "true" ]; then
-            echo 'engines=["all","ghidra","hopper","ida"]' >> "$GITHUB_OUTPUT"
-          else
-            echo 'engines=["ghidra"]' >> "$GITHUB_OUTPUT"
-          fi
-
   build:
-    needs: setup
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write          # required to push to ghcr.io
     strategy:
       fail-fast: false
       matrix:
-        engine: ${{ fromJSON(needs.setup.outputs.engines) }}
+        include:
+          - engine: all
+            image: rea-agent
+          - engine: ghidra
+            image: rea-agent-ghidra
+          - engine: hopper
+            image: rea-agent-hopper
+          - engine: ida
+            image: rea-agent-ida
+    env:
+      LOCAL_IMAGE: rea-agent-${{ matrix.engine }}:ci
+      GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Derive the tag from the Dockerfile (no version drift)
+        run: |
+          rea_version="$(grep -m1 '^ARG REA_VERSION=' Dockerfile | cut -d= -f2)"
+          echo "REA_VERSION=$rea_version" >> "$GITHUB_ENV"
+          echo "TAG_SUFFIX=${rea_version}-linux-amd64" >> "$GITHUB_ENV"
+          echo "tagging as ${rea_version}-linux-amd64 and latest"
 
       - name: Free disk space (each image is ~8-9 GB)
         run: |
@@ -157,20 +210,32 @@ jobs:
           sudo docker image prune -af || true
           df -h /
 
-      - name: Build rea-agent (linux/amd64, engine=${{ matrix.engine }})
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build ${{ matrix.image }} (linux/amd64, engine=${{ matrix.engine }})
         run: |
           docker build --progress=plain --platform linux/amd64 \
-            --tag "rea-agent-${{ matrix.engine }}:ci" \
-            --build-arg REA_ENGINE=${{ matrix.engine }} \
+            --tag "$LOCAL_IMAGE" \
+            --build-arg "REA_ENGINE=${{ matrix.engine }}" \
+            --build-arg "OCI_SOURCE=${{ github.server_url }}/${{ github.repository }}" \
             .
           df -h /
 
-      - name: Image size and engine profile
+      - name: Image size, engine profile and labels
         run: |
-          docker image inspect "rea-agent-${{ matrix.engine }}:ci" --format '{{.Size}} bytes'
-          docker image inspect "rea-agent-${{ matrix.engine }}:ci" \
+          docker image inspect "$LOCAL_IMAGE" --format '{{.Size}} bytes'
+          docker image inspect "$LOCAL_IMAGE" \
             --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^REA_ENGINE='
-          docker run --rm "rea-agent-${{ matrix.engine }}:ci" \
+          # The source label is what links the GHCR package to this repo; if it
+          # is missing the push still works but the package stays unrelated.
+          docker image inspect "$LOCAL_IMAGE" \
+            --format '{{index .Config.Labels "org.opencontainers.image.source"}}'
+          docker run --rm "$LOCAL_IMAGE" \
             bash -c 'echo "engine: $(cat /usr/local/share/rea/engine)"; cat /usr/local/share/rea/engine.env; rea --version'
 
       - name: Runs as an arbitrary uid (a foreign uid must not break the entrypoint)
@@ -179,7 +244,7 @@ jobs:
           # does not know. The entrypoint must still reach "ready" through its
           # HOME fallback instead of dying on mkdir - this exact bug failed the
           # first CI attempt ("mkdir: cannot create directory '/tmp/rea/home'").
-          out="$(docker run --rm --user 12345:12345 "rea-agent-${{ matrix.engine }}:ci" \
+          out="$(docker run --rm --user 12345:12345 "$LOCAL_IMAGE" \
                    bash -c 'echo "home=$HOME"; rea --version' 2>&1)"
           printf '%s\n' "$out"
           printf '%s' "$out" | grep -qE '^6\.' || { echo "rea --version failed as uid 12345"; exit 1; }
@@ -194,15 +259,33 @@ jobs:
           docker run --rm --shm-size=1g \
             --user "$(id -u):$(id -g)" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
-            "rea-agent-${{ matrix.engine }}:ci" /opt/rea/verify/verify-all.sh --quick
+            "$LOCAL_IMAGE" /opt/rea/verify/verify-all.sh --quick
 
       - name: Full verification (engine analysis + HTTP bridge)
-        if: inputs.full
+        if: github.event_name == 'workflow_dispatch' && inputs.full
         run: |
           docker run --rm --shm-size=4g \
             --user "$(id -u):$(id -g)" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
-            "rea-agent-${{ matrix.engine }}:ci" /opt/rea/verify/verify-all.sh
+            "$LOCAL_IMAGE" /opt/rea/verify/verify-all.sh
+
+      - name: Publish to GHCR (${{ matrix.image }})
+        # Only reached when the steps above succeeded: a failing harness or a
+        # broken foreign-uid run never publishes.
+        run: |
+          docker tag "$LOCAL_IMAGE" "$GHCR_IMAGE:$TAG_SUFFIX"
+          docker tag "$LOCAL_IMAGE" "$GHCR_IMAGE:latest"
+          docker push --all-tags "$GHCR_IMAGE"
+          {
+            echo "### published \`$GHCR_IMAGE\`"
+            echo
+            echo '```'
+            docker image inspect "$GHCR_IMAGE:$TAG_SUFFIX" --format 'tags: {{.RepoTags}}'
+            docker image inspect "$GHCR_IMAGE:$TAG_SUFFIX" --format 'size: {{.Size}} bytes'
+            echo "pulls:  docker pull $GHCR_IMAGE:$TAG_SUFFIX"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker image inspect "$GHCR_IMAGE:$TAG_SUFFIX" --format '{{index .RepoDigests 0}}'
 
       - name: Publish verification summary
         if: always()

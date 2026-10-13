@@ -231,6 +231,29 @@ continues with a warning instead of aborting. If you see the warning, either bui
 with `REA_UID`/`REA_GID` matching your user (`id -u`/`id -g`) or fix the volume's
 ownership once: `docker compose exec -u 0 rea-agent chown -R $(id -u):$(id -g) /home/rea`.
 
+**`docker compose pull` says denied / manifest unknown / not found**
+The GHCR packages are public, so `denied` usually means one of three things:
+you are pulling a name that does not exist yet (check
+`ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64` exactly — tags are
+per-image, there is no repo-wide `latest`), you are offline/behind a proxy that
+blocks `ghcr.io`, or a fork is asking for the upstream namespace. If *your own*
+pushed package is private, fix it once in the UI: package → **Settings → Change
+visibility → Public** (or add the `org.opencontainers.image.source` label so the
+package inherits the repository's visibility).
+
+**A build or verify step uses a different image than compose**
+All of them resolve names through `scripts/image-name.sh <engine>`, which reads
+`REA_IMAGE` / `REA_GHIDRA_IMAGE` / `REA_HOPPER_IMAGE` / `REA_IDA_IMAGE` from
+`.env`. Print what any engine resolves to:
+
+```bash
+scripts/image-name.sh ghidra          # or all | hopper | ida
+make sizes                            # what is actually present locally
+```
+
+If you see a plain `rea-agent-ghidra:6.4.0-linux-amd64`, your `.env` is missing
+the GHCR values (copy them from `.env.example`).
+
 **A `--profile <engine> up -d` starts two containers**
 By design: a compose service without a profile always starts, so
 `--profile ghidra up -d` also starts the default `rea-agent`. Name the service

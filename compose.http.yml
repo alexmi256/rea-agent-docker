@@ -20,7 +20,7 @@ services:
     # REA_ENGINE in .env to match (see docs/IMAGES.md), e.g.
     #   REA_IMAGE=rea-agent-hopper:6.4.0-linux-amd64 REA_ENGINE=hopper
     # `make http-up-ghidra` / `-hopper` / `-ida` do this for you.
-    image: ${REA_IMAGE:-rea-agent:6.4.0-linux-amd64}
+    image: ${REA_IMAGE:-ghcr.io/alexmi256/rea-agent:6.4.0-linux-amd64}
     container_name: ${REA_MCP_HTTP_CONTAINER_NAME:-rea-mcp-http}
     platform: linux/amd64
     init: true

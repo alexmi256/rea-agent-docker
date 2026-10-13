@@ -18,6 +18,9 @@ engineering without installing a single tool on the host.
   `rea-agent-hopper`, `rea-agent-ida` (no bundled engine). Same auxiliary
   toolchain in all four — pick the disassembler you actually use:
   [docs/IMAGES.md](docs/IMAGES.md).
+* **Published to GHCR:** all four are built and pushed to
+  `ghcr.io/alexmi256/…` on every push to `main`, so `docker compose pull` works
+  without building anything ([below](#a-pull-a-published-image-recommended--no-build)).
 * **Surface:** REA's MCP server, ~170 tools, stdio by default (spawned by the
   client through `docker exec`) or Streamable HTTP via an optional bridge.
 * **Verified:** the image ships a harness that actually runs the engines —
@@ -31,12 +34,38 @@ engineering without installing a single tool on the host.
 
 ## Quick start
 
+Two ways in: **pull the published image** (nothing to build) or **build it
+yourself**. Both converge on the same image names, so you can switch later
+without re-arranging anything.
+
+### A. Pull a published image (recommended — no build)
+
+Images are published to the GitHub Container Registry on every push to `main`:
+
+| Image | Engine |
+| ----- | ------ |
+| `ghcr.io/alexmi256/rea-agent:6.4.0-linux-amd64` | Ghidra + Hopper |
+| `ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64` | Ghidra only |
+| `ghcr.io/alexmi256/rea-agent-hopper:6.4.0-linux-amd64` | Hopper only |
+| `ghcr.io/alexmi256/rea-agent-ida:6.4.0-linux-amd64` | no engine (bring your own IDA) |
+
+Each also carries a `:latest` tag. The packages are public — no login, no token,
+just:
+
 ```bash
 git clone <this repo> rea-agent-docker && cd rea-agent-docker
-cp .env.example .env          # set REA_UID/REA_GID to your host user
+cp .env.example .env           # already points at ghcr.io; set REA_UID/REA_GID to your user
+docker compose pull            # or: make pull-all   — ~8 GB per image
+docker compose --profile ghidra up -d rea-ghidra
+docker compose exec rea-ghidra rea doctor --json
+```
 
-# build the engine you use (or `make build-all` for all four)
-make build-ghidra             # ~10-25 min first time
+### B. Build it yourself
+
+```bash
+git clone <this repo> rea-agent-docker && cd rea-agent-docker
+cp .env.example .env           # set REA_UID/REA_GID to your host user
+make build-ghidra              # ~10-25 min first time; or make build-all for all four
 docker compose --profile ghidra up -d rea-ghidra
 docker compose exec rea-ghidra rea doctor --json
 ```
@@ -54,7 +83,7 @@ changes between engines:
 mcp_servers:
   rea:
     command: "docker"
-    args: ["exec", "-i", "rea-agent-ghidra", "rea", "mcp"]   # rea-agent-hopper / rea-agent-ida
+    args: ["exec", "-i", "rea-agent-ghidra", "rea", "mcp"]   # rea-agent / rea-agent-hopper / rea-agent-ida
     timeout: 1800
     connect_timeout: 120
 ```
@@ -248,6 +277,12 @@ catalog, refused ELF machine, unlicensed IDA/JEB).
   `HOST_PATH_MAP=<container-path>=<host-path>` in `.env`, for the Hermes layout
   `HOST_PATH_MAP=/opt/data=/flashcache/hermes`. Empty by default, which is right
   for a normal host and for compose.
+* **Image names come from one place.** `scripts/image-name.sh <engine>` resolves
+  the image for an engine: it honours `REA_IMAGE` / `REA_GHIDRA_IMAGE` /
+  `REA_HOPPER_IMAGE` / `REA_IDA_IMAGE` from `.env` (GHCR names by default) and
+  falls back to a plain local name. The Makefile, `scripts/build.sh`,
+  `scripts/verify.sh` and compose all use it, so what you build, what you verify
+  and what you pull are never different names. CI fails if they drift.
 * **Tool-catalog size.** REA ships ~170 tools. The image defaults to
   `REA_MCP_INPUT_SCHEMA_PROFILE=compact` (~290 KB vs ~496 KB of schema per
   request); set `full` if a client needs complete nested schemas.

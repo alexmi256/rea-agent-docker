@@ -36,10 +36,7 @@ fi
 TAG_SUFFIX="${REA_TAG:-6.4.0-linux-amd64}"
 
 image_for() {
-    case "$1" in
-        all) printf 'rea-agent:%s' "$TAG_SUFFIX" ;;
-        *)   printf 'rea-agent-%s:%s' "$1" "$TAG_SUFFIX" ;;
-    esac
+    "$PROJECT_DIR/scripts/image-name.sh" "$1"
 }
 
 declare -a RESULTS=()

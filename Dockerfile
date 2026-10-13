@@ -624,5 +624,24 @@ EXPOSE 8811
 HEALTHCHECK --interval=60s --timeout=90s --start-period=120s --retries=3 \
     CMD ["/usr/local/bin/rea-agent-healthcheck"]
 
+# =============================================================================
+# OCI metadata - deliberately the LAST instructions.
+# Labels are image metadata, so placing them here means adding one never
+# invalidates the cached Ghidra/Hopper/IDA layers above.
+#
+# org.opencontainers.image.source is not decoration: it is what links a package
+# published to ghcr.io back to this repository, and it is what lets the package
+# inherit the repository's access (public image for a public repo). Without it a
+# pushed image stays private and unrelated to the repo in the GitHub UI.
+# =============================================================================
+ARG OCI_SOURCE=https://github.com/alexmi256/rea-agent-docker
+LABEL org.opencontainers.image.source="${OCI_SOURCE}" \
+      org.opencontainers.image.title="rea-agent-${REA_ENGINE}" \
+      org.opencontainers.image.description="REA (Reverse Engineer Anything) with the '${REA_ENGINE}' engine profile plus a full reverse-engineering toolchain (Ghidra/Hopper/IDA-ready, firmware, captures, browsers, managed code, Android, debuggers), MCP-ready." \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${REA_VERSION}-linux-amd64" \
+      org.opencontainers.image.base.name="docker.io/library/ubuntu:24.04" \
+      com.rea.engine="${REA_ENGINE}"
+
 ENTRYPOINT ["/usr/local/bin/rea-agent-entrypoint"]
 CMD ["sleep", "infinity"]

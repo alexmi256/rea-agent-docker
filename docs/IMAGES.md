@@ -43,6 +43,71 @@ stale path to a missing engine. The healthcheck and the verification harness rea
 `/usr/local/share/rea/engine` and skip (rather than fail) on checks for engines the image
 does not ship, which is why one harness serves all four.
 
+## Pull instead of build (GHCR)
+
+You do not have to build anything. All four images are published to the GitHub
+Container Registry by CI on every push to `main`, and the packages are **public**
+(no login, no token):
+
+| Image | Engine | Tags |
+| --- | --- | --- |
+| `ghcr.io/alexmi256/rea-agent` | Ghidra + Hopper | `6.4.0-linux-amd64`, `latest` |
+| `ghcr.io/alexmi256/rea-agent-ghidra` | Ghidra | `6.4.0-linux-amd64`, `latest` |
+| `ghcr.io/alexmi256/rea-agent-hopper` | Hopper | `6.4.0-linux-amd64`, `latest` |
+| `ghcr.io/alexmi256/rea-agent-ida` | no engine (BYO IDA) | `6.4.0-linux-amd64`, `latest` |
+
+```bash
+# the compose defaults are already these names, so:
+docker compose pull                       # everything you have profiles for
+docker compose --profile ghidra up -d rea-ghidra
+
+# or, explicitly per engine
+docker pull ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64
+make pull ENGINE=hopper                   # same thing via the Makefile
+make pull-all                             # all four (~8 GB each)
+make sizes                                # what you now have locally, with sizes
+```
+
+A pulled image is a normal rea-agent image: `make verify ENGINE=ghidra` runs the
+same harness against it (the resolver in `scripts/image-name.sh` picks the pulled
+name), and `docker compose exec rea-ghidra rea doctor --json` works immediately.
+
+Notes:
+
+* **`latest` is per image, not per repo.** There is no "one latest": each engine
+  image tracks its own newest build, and the version tag (`6.4.0-linux-amd64`)
+  is what you should pin in anything reproducible.
+* **Air-gapped transfer.** `docker save ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64 | gzip > rea-ghidra.tgz`
+  then `docker load < rea-ghidra.tgz` on the other side.
+* **The images are ~8 GB each** and most of that is the auxiliary toolchain, not
+  the engine — see the size table below for the per-engine deltas.
+* **Rebuilds are unnecessary but supported**: the published names are exactly what
+  `make build-ghidra` tags, so building from source *replaces* the pulled image
+  rather than creating a second one.
+
+### Publishing your own fork
+
+The workflow publishes `ghcr.io/<repo-owner>/...` automatically — on a fork, the
+owner is your account, so the images appear under your namespace and the compose
+defaults (which point at `alexmi256`) will no longer match. To publish under your
+own account:
+
+1. Update the four `REA_*_IMAGE` names in `.env.example`, and the fallbacks in
+   `docker-compose.yml` / `compose.http.yml`, to your own
+   `ghcr.io/<you>/...` names (the CI `validate` job fails if these, the resolver
+   output and the docs disagree — that check exists to catch exactly this).
+2. Make sure the token can push packages: the `build` job declares
+   `permissions: packages: write`, which is enough unless the repository is set to
+   restrict it (**Settings → Actions → General → Workflow permissions** →
+   "Read and write permissions").
+3. Keep the `org.opencontainers.image.source` label pointing at *your* repo (it is
+   built from `github.server_url`/`github.repository` in CI). It is what links the
+   package to the repository, and what makes the package inherit the repository's
+   visibility — drop it and your images stay private and unlinked in the UI.
+4. Push to `main`; the packages appear under your profile → Packages. To make them
+   public (if your repo is public and they did not inherit it): package →
+   **Settings → Change visibility → Public**.
+
 ## Building
 
 ```bash

@@ -12,13 +12,18 @@
 #   scripts/build.sh --engine hopper --verify-quick
 #   scripts/build.sh --engine ida --no-cache
 #
+# The image name comes from scripts/image-name.sh, which honours the per-engine
+# REA_*_IMAGE variables in .env (GHCR names by default, so a local build tags the
+# same name `docker compose pull` would fetch) and falls back to a plain local
+# name. `--image` overrides it.
+#
 # REA_UID / REA_GID are read from the environment or .env and passed to the
 # build, so the image's runtime user matches your host user (the harness and the
 # compose mounts assume that). Unset, the Dockerfile default 1000 is used, which
 # the image handles even though Ubuntu ships a stock uid 1000.
 #
 #   HOST_PATH_MAP  colon-separated list of <container-path>=<host-path>
-#                  (default: the Hermes bind-mount pair)
+#                  (Docker-outside-of-Docker only; see the header comment above)
 # =============================================================================
 set -euo pipefail
 
@@ -28,24 +33,13 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # and nothing needs translating. Hermes-in-Docker users set it in .env, e.g.
 #   HOST_PATH_MAP=/opt/data=/flashcache/hermes
 HOST_PATH_MAP="${HOST_PATH_MAP:-}"
-IMAGE="${REA_IMAGE:-}"
+IMAGE=""       # set by --image, else derived from the engine via image-name.sh
 DOCKER="${DOCKER:-docker}"
 BUILD_ARGS=()
 ENGINE="all"
 REA_TAG="${REA_TAG:-6.4.0-linux-amd64}"
 
-usage() { sed -n '2,14p' "$0"; exit 0; }
-
-# image name per engine profile (matches docker-compose.yml)
-engine_image() {
-    case "$1" in
-        all)    printf 'rea-agent:%s' "$REA_TAG" ;;
-        ghidra) printf 'rea-agent-ghidra:%s' "$REA_TAG" ;;
-        hopper) printf 'rea-agent-hopper:%s' "$REA_TAG" ;;
-        ida)    printf 'rea-agent-ida:%s' "$REA_TAG" ;;
-        *) echo "unknown engine: $1 (use all|ghidra|hopper|ida)" >&2; exit 2 ;;
-    esac
-}
+usage() { sed -n '2,20p' "$0"; exit 0; }
 
 host_path() {
     local path="$1" pair container_prefix host_prefix
@@ -86,7 +80,9 @@ if [ -f "$PROJECT_DIR/.env" ]; then
     . "$PROJECT_DIR/.env"
     REA_TAG="${REA_TAG:-6.4.0-linux-amd64}"
 fi
-[ -n "$IMAGE" ] || IMAGE="$(engine_image "$ENGINE")"
+# Image name: --image wins, otherwise the shared helper (which reads .env, so a
+# GHCR-published name here means `docker build` tags exactly what compose pulls).
+[ -n "$IMAGE" ] || IMAGE="$("$PROJECT_DIR/scripts/image-name.sh" "$ENGINE")"
 
 CONTEXT="$(host_path "$PROJECT_DIR")"
 echo "project : $PROJECT_DIR"

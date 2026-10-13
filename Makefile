@@ -16,11 +16,12 @@ DOCKER ?= docker
 COMPOSE ?= $(DOCKER) compose
 TAG_SUFFIX ?= 6.4.0-linux-amd64
 
-# engine -> image / compose service / profile
-engine_image   = $(if $(filter all,$(1)),rea-agent:$(TAG_SUFFIX),rea-agent-$(1):$(TAG_SUFFIX))
+# engine -> compose service / profile (the image name comes from
+# scripts/image-name.sh, which also honours the REA_*_IMAGE names in .env, so a
+# local build tags exactly what `docker compose pull` would fetch)
 engine_service = $(if $(filter all,$(1)),rea-agent,rea-$(1))
 
-IMAGE    := $(call engine_image,$(ENGINE))
+IMAGE    := $(shell scripts/image-name.sh $(ENGINE))
 SERVICE  := $(call engine_service,$(ENGINE))
 PROFILE  := $(if $(filter all,$(ENGINE)),,--profile $(ENGINE))
 COMPOSE_ENGINE = $(COMPOSE) -f docker-compose.yml
@@ -92,11 +93,23 @@ verify-quick: ## fast verification (tool presence + static + MCP handshake)
 
 .PHONY: verify-ghidra verify-hopper verify-ida
 verify-ghidra: ## full verification of the Ghidra-only image
-	scripts/verify.sh --image $(call engine_image,ghidra) --only tools,analysis,static,clients,mcp
+	scripts/verify.sh --engine ghidra --only tools,analysis,static,clients,mcp
 verify-hopper: ## full verification of the Hopper-only image
-	scripts/verify.sh --image $(call engine_image,hopper) --only tools,analysis,static,clients,mcp
+	scripts/verify.sh --engine hopper --only tools,analysis,static,clients,mcp
 verify-ida: ## verification of the engine-less IDA image
-	scripts/verify.sh --image $(call engine_image,ida) --only tools,static,clients,mcp
+	scripts/verify.sh --engine ida --only tools,static,clients,mcp
+
+.PHONY: pull
+pull: ## pull the published image for $(ENGINE) from GHCR (no local build)
+	$(DOCKER) pull $(IMAGE)
+
+.PHONY: pull-all
+pull-all: ## pull all four published images from GHCR
+	@for e in all ghidra hopper ida; do \
+	  img="$$( scripts/image-name.sh $$e )"; \
+	  echo "== pulling $$img"; \
+	  $(DOCKER) pull "$$img" || exit 1; \
+	done
 
 .PHONY: mcp-stdio
 mcp-stdio: ## speak MCP over stdio the way Hermes does
@@ -118,15 +131,15 @@ test-host: ## run the harness in a throwaway container against ./work
 	  /opt/rea/verify/verify-all.sh
 
 .PHONY: sizes
-sizes: ## report the size of every built engine image
+sizes: ## report the size of every engine image
 	@for e in all ghidra hopper ida; do \
-	  case "$$e" in all) img="rea-agent:$(TAG_SUFFIX)" ;; *) img="rea-agent-$$e:$(TAG_SUFFIX)" ;; esac; \
+	  img="$$( scripts/image-name.sh $$e )"; \
 	  bytes="$$( $(DOCKER) image inspect "$$img" --format '{{.Size}}' 2>/dev/null || echo '' )"; \
 	  if [ -n "$$bytes" ]; then \
 	    human="$$(awk -v b="$$bytes" 'BEGIN{printf "%.2f GB", b/1024/1024/1024}')"; \
-	    printf '  %-38s %s (%s bytes)\n' "$$img" "$$human" "$$bytes"; \
+	    printf '  %-52s %s (%s bytes)\n' "$$img" "$$human" "$$bytes"; \
 	  else \
-	    printf '  %-38s %s\n' "$$img" "not built"; \
+	    printf '  %-52s %s\n' "$$img" "not built/pulled"; \
 	  fi; \
 	done
 

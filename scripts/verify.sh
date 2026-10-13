@@ -5,7 +5,8 @@
 #   scripts/verify.sh                      # the default (all-engines) image
 #   scripts/verify.sh --quick              # tool presence, static analysis, MCP handshake
 #   scripts/verify.sh --only tools,mcp
-#   scripts/verify.sh --image rea-agent-hopper:6.4.0-linux-amd64
+#   scripts/verify.sh --engine hopper      # whatever image that engine resolves to
+#   scripts/verify.sh --image ghcr.io/<owner>/rea-agent-hopper:6.4.0-linux-amd64
 #   scripts/verify.sh --compose --service rea-ghidra   # exec inside a compose service
 # =============================================================================
 set -euo pipefail
@@ -17,14 +18,15 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # normal host); Hermes-in-Docker users set it in .env, e.g.
 #   HOST_PATH_MAP=/opt/data=/flashcache/hermes
 HOST_PATH_MAP="${HOST_PATH_MAP:-}"
-IMAGE="${REA_IMAGE:-rea-agent:6.4.0-linux-amd64}"
+IMAGE=""
 DOCKER="${DOCKER:-docker}"
 COMPOSE=0
 SERVICE="${REA_SERVICE:-rea-agent}"
+ENGINE=""
 ARGS=()
 
 if [ -f "$PROJECT_DIR/.env" ]; then
-    # .env supplies REA_UID/REA_GID, REA_IMAGE, HOST_PATH_MAP and friends. It is
+    # .env supplies REA_UID/REA_GID, REA_*_IMAGE, HOST_PATH_MAP and friends. It is
     # gitignored, so host-specific values live there and never in the repo.
     # shellcheck disable=SC1091
     . "$PROJECT_DIR/.env"
@@ -32,13 +34,20 @@ fi
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        --engine) ENGINE="$2"; shift 2 ;;
         --image) IMAGE="$2"; shift 2 ;;
         --compose) COMPOSE=1; shift ;;
         --service) SERVICE="$2"; shift 2 ;;
-        -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
         *) ARGS+=("$1"); shift ;;
     esac
 done
+
+# Resolve the image: --image wins, then --engine via the shared helper (which
+# also honours the REA_*_IMAGE names in .env), then the all-engines default.
+if [ -z "$IMAGE" ]; then
+    IMAGE="$("$PROJECT_DIR/scripts/image-name.sh" "${ENGINE:-all}")"
+fi
 
 if [ "$COMPOSE" = "1" ]; then
     exec docker compose -f "$PROJECT_DIR/docker-compose.yml" exec -T "$SERVICE" \
