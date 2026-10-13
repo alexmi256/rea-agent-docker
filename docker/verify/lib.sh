@@ -94,10 +94,12 @@ check_json_file() {
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # --- engine awareness --------------------------------------------------------
-# Each image declares the engine(s) it ships in /etc/rea/engine (written at
-# build time from the REA_ENGINE build arg). Checks for an engine the image
-# does not carry are SKIPped, so one harness serves all four images.
-image_engine() { cat /etc/rea/engine 2>/dev/null || echo all; }
+# Each image declares the engine(s) it ships in /usr/local/share/rea/engine
+# (written at build time from the REA_ENGINE build arg; /usr/local/share, not
+# /etc/rea, because compose mounts the user's ./config over /etc/rea). Checks for
+# an engine the image does not carry are SKIPped, so one harness serves all four
+# images.
+image_engine() { cat /usr/local/share/rea/engine 2>/dev/null || echo all; }
 engine_has() { # engine_has ghidra|hopper|ida
     local e; e="$(image_engine)"
     [ "$e" = "all" ] || [ "$e" = "$1" ]
@@ -118,6 +120,22 @@ case "$(image_engine)" in
         fi
         ;;
 esac
+
+# Adopt this image's engine paths for the harness's own checks, exactly as the
+# `rea` wrapper does for REA. Without this, a single-engine image would leave the
+# other engine's variables unset and `set -u` would abort the phase instead of
+# skipping it. The defaults below exist only so an unguarded reference can never
+# abort; every use is behind engine_has, so a path for an absent engine is never
+# actually asserted on.
+if [ -r /usr/local/share/rea/engine.env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . /usr/local/share/rea/engine.env
+    set +a
+fi
+: "${GHIDRA_INSTALL_DIR:=/opt/ghidra}"
+: "${HOPPER_LAUNCHER_PATH:=/opt/hopper/bin/Hopper}"
+: "${IDADIR:=/opt/ida}"
 
 # --- release-aware helpers ---------------------------------------------------
 # REA's catalog differs between the npm release and repository main (main is

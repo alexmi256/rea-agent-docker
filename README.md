@@ -198,7 +198,7 @@ make verify ENGINE=hopper      # ... the Hopper-only image
 make verify ENGINE=ida         # ... the engine-less IDA image (native checks skip)
 ```
 
-The harness is engine-aware: it reads `/etc/rea/engine` and **skips** checks for
+The harness is engine-aware: it reads `/usr/local/share/rea/engine` and **skips** checks for
 engines the image does not ship rather than failing them, so one harness serves
 all four images. A skip always states the reason (`not in this image (engine:
 hopper)`), and the `ida` image additionally reports that native analysis needs a

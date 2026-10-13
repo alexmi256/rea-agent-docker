@@ -15,7 +15,7 @@
 #  Every image carries the same auxiliary toolchain (firmware extraction,
 #  captures, browsers, managed code, Android, debuggers, cross toolchains,
 #  binfmt/QEMU); the images differ only in the native analysis engine and in
-#  what /etc/rea/engine.env advertises. See docs/IMAGES.md.
+#  what /usr/local/share/rea/engine.env advertises. See docs/IMAGES.md.
 #
 #  Optional overlays:
 #    -f compose.http.yml   publish REA's MCP surface over Streamable HTTP
@@ -48,7 +48,7 @@ x-build-args: &build-args
 # --- engine-independent runtime environment ---------------------------------
 # Engine paths (GHIDRA_INSTALL_DIR, HOPPER_LAUNCHER_PATH, IDADIR) are NOT here:
 # each service sets the ones its own image actually ships, and the image's
-# /etc/rea/engine.env supplies them for `docker run` / bare `rea` invocations.
+# /usr/local/share/rea/engine.env supplies them for `docker run` / bare `rea` invocations.
 #
 # NOTE: REA rejects *empty* values for its own REA_* settings
 # ("configuration_invalid: Too small: expected string to have >=1 characters"),

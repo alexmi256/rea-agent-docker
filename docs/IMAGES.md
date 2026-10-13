@@ -32,15 +32,15 @@ are both here" behaviour:
 
 | Path | Content | Read by |
 | --- | --- | --- |
-| `/etc/rea/engine` | `all` / `ghidra` / `hopper` / `ida` | healthcheck, entrypoint, verification harness |
-| `/etc/rea/engine.env` | only the paths this image needs (`GHIDRA_INSTALL_DIR`, `HOPPER_LAUNCHER_PATH`, `IDADIR`, `JAVA_HOME`) plus `REA_ANALYSIS_PROVIDER` for single-engine images | the `rea` wrapper |
+| `/usr/local/share/rea/engine` | `all` / `ghidra` / `hopper` / `ida` | healthcheck, entrypoint, verification harness |
+| `/usr/local/share/rea/engine.env` | only the paths this image needs (`GHIDRA_INSTALL_DIR`, `HOPPER_LAUNCHER_PATH`, `IDADIR`, `JAVA_HOME`) plus `REA_ANALYSIS_PROVIDER` for single-engine images | the `rea` wrapper |
 | `/usr/local/bin/rea` | wrapper that sources `engine.env`, then execs the real shim | every `rea` invocation |
 
 The wrapper is what makes `docker exec -i <container> rea mcp` work with no
 compose environment at all - and what keeps a single-engine image *honest*: an
 image without Ghidra never advertises `GHIDRA_INSTALL_DIR`, so REA never sees a
 stale path to a missing engine. The healthcheck and the verification harness read
-`/etc/rea/engine` and skip (rather than fail) on checks for engines the image
+`/usr/local/share/rea/engine` and skip (rather than fail) on checks for engines the image
 does not ship, which is why one harness serves all four.
 
 ## Building
@@ -117,16 +117,22 @@ Every image is large on purpose (the brief was "a heavy base with a pile of tool
 built in"), and the auxiliary toolchain dominates the size - the engine is a
 minority of it. Measured on this project's build host:
 
-| Image | Compressed size |
+| Image | Size (`docker image inspect .Size`) |
 | --- | --- |
-| `rea-agent` (Ghidra + Hopper) | _see `make sizes`_ |
-| `rea-agent-ghidra` | _see `make sizes`_ |
-| `rea-agent-hopper` | _see `make sizes`_ |
-| `rea-agent-ida` | _see `make sizes`_ |
+| `rea-agent` (Ghidra + Hopper) | 8.39 GiB — 9,008,646,760 bytes |
+| `rea-agent-ghidra` | 8.30 GiB — 8,916,514,893 bytes |
+| `rea-agent-hopper` | 7.55 GiB — 8,102,794,596 bytes |
+| `rea-agent-ida` | 7.46 GiB — 8,010,622,529 bytes |
 
-`make sizes` prints them for whatever is built. If you want the size down, the
-engine choice alone will not get you far - turn off the parts you do not need
-instead:
+Measured with `make sizes` on this build host (amd64). Read the deltas rather
+than the totals: **Ghidra costs ~906 MB and Hopper ~92 MB** on top of the
+engine-less `ida` image (Hopper's Qt6/X11 runtime is already in the shared base
+layers, which the browser tooling needs anyway). The auxiliary toolchain is the
+rest, so the engine choice is a smaller lever on size than you might expect —
+what you really buy with a single-engine image is a smaller surface (no second
+engine's libraries, licence files or runtime in the container), a quicker build,
+and a `rea providers` listing that can only say one thing. If size is the goal,
+switch components off instead:
 
 ```bash
 scripts/build.sh --engine ghidra \

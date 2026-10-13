@@ -16,10 +16,22 @@ else
 fi
 
 section "engine profile"
-check "declared engine"      "." -- cat /etc/rea/engine
-check "engine env file"      "." -- cat /etc/rea/engine.env
-check "rea wrapper injects engine env" "^/opt/(ghidra|hopper)" \
-    -- bash -c "rea_engine_env_noop() { :; }; [ -r /etc/rea/engine.env ] && grep -c '^export ' /etc/rea/engine.env >/dev/null && . /etc/rea/engine.env && case \"\$(cat /etc/rea/engine)\" in all|ghidra) echo \"\$GHIDRA_INSTALL_DIR\" ;; all|hopper) echo \"\$HOPPER_LAUNCHER_PATH\" ;; ida) echo /opt/ida ;; esac"
+check "declared engine"      "." -- cat /usr/local/share/rea/engine
+# The ida image legitimately has no engine paths at all, so this asserts the file
+# exists and reports how much it declares rather than requiring content.
+check "engine env file"      "engine.env present" \
+    -- bash -c 'test -f /usr/local/share/rea/engine.env && echo "engine.env present ($(grep -c "^export " /usr/local/share/rea/engine.env || true) exports)"'
+check "rea wrapper injects engine env" "^/opt/(ghidra|hopper)|^/opt/ida$" \
+    -- bash -c '[ -r /usr/local/share/rea/engine.env ] && . /usr/local/share/rea/engine.env && case "$(cat /usr/local/share/rea/engine)" in all|ghidra) echo "$GHIDRA_INSTALL_DIR" ;; all|hopper) echo "$HOPPER_LAUNCHER_PATH" ;; ida) echo "${IDADIR:-/opt/ida}" ;; esac'
+check "rea wrapper is the engine-injecting shell script" "engine.env" \
+    -- bash -c 'head -6 /usr/local/bin/rea; test -x /usr/local/bin/rea-npm-shim && echo "npm shim present"'
+
+section "container healthcheck"
+# The same script Docker runs as HEALTHCHECK: it must call THIS image healthy, and
+# must not demand an engine the image does not carry.
+check "healthcheck reports healthy" "^healthy:" -- /usr/local/bin/rea-agent-healthcheck
+check "healthcheck (deep) reports healthy" "^healthy:" \
+    -- bash -c 'REA_HEALTHCHECK_DEEP=1 /usr/local/bin/rea-agent-healthcheck'
 
 section "analysis engines"
 check "java runtime"        "openjdk|java"             -- bash -c "java -version 2>&1 | head -1"

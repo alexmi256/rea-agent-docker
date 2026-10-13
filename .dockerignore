@@ -2,8 +2,12 @@
 .gitignore
 .env
 .github
-vendor/*.deb
-vendor/ida/*
+# vendor/ IS part of the build context on purpose: the Dockerfile consumes
+# vendor/*.deb (licensed Hopper) and vendor/ida/*.run + *.hexlic (baking IDA in)
+# when the matching build arg allows it. Those files are excluded from *git* by
+# .gitignore, so they can never be committed or pushed - but the build must see
+# them or the documented bring-your-own paths silently do nothing.
+# Runtime state does not belong in the image:
 vendor/hopper-state/*
 !vendor/README.md
 !vendor/.gitkeep

@@ -2,15 +2,21 @@
 
 REA analyses binaries for many architectures; the depth depends on the engine
 you point it at and on whether you need to *run* the code or only read it.
-This image is built so both are possible.
+These images are built so both are possible.
+
+Which engine you have depends on which image you built: Ghidra in `rea-agent`
+and `rea-agent-ghidra`, Hopper in `rea-agent` and `rea-agent-hopper`, none
+bundled in `rea-agent-ida` (see [IMAGES.md](IMAGES.md)). The recipes below use
+the all-engines service `rea-agent`; swap in your service name
+(`rea-ghidra`, `rea-hopper`, `rea-ida`) if you run a single-engine image.
 
 ## Architecture coverage of the engines
 
-| Engine            | Architectures it can disassemble/decompile                                        | Notes |
-| ----------------- | --------------------------------------------------------------------------------- | ----- |
-| **Ghidra 12.1.4** | x86/x86-64, 16-bit x86 (DOS MZ/COM), ARM/Thumb (32/64), MIPS (32/64, LE/BE, micro), PowerPC, RISC-V, SuperH, 6502/65816, Z80, 68000, Atmel AVR, MSP430, Tricore, ... | The broad engine. The native decompiler for the host (`linux_x86_64`) is shipped and is what REA requires. |
-| **IDA Pro/Home**  | 60+ processor modules depending on licence tier                                    | Only via your own IDA + MCP registration. IDA **Free** = x86/x86-64 only, cloud decompiler, no idalib. |
-| **Hopper 6.5**    | x86/x86-64, ARM/ARM64 (incl. Mach-O, dylibs), and the container formats of Apple platforms | Weaker on MIPS/PPC/RISC-V. macOS `.app`/FAT binaries and FAT64 are handled by REA's Hopper loader preparation. |
+| Engine            | Architectures it can disassemble/decompile                                        | Notes | Image |
+| ----------------- | --------------------------------------------------------------------------------- | ----- | ----- |
+| **Ghidra 12.1.4** | x86/x86-64, 16-bit x86 (DOS MZ/COM), ARM/Thumb (32/64), MIPS (32/64, LE/BE, micro), PowerPC, RISC-V, SuperH, 6502/65816, Z80, 68000, Atmel AVR, MSP430, Tricore, ... | The broad engine. The native decompiler for the host (`linux_x86_64`) is shipped and is what REA requires. | `all`, `ghidra` |
+| **IDA Pro/Home**  | 60+ processor modules depending on licence tier                                    | Only via your own IDA + MCP registration. IDA **Free** = x86/x86-64 only, cloud decompiler, no idalib. | `all`, `ida` (BYO) |
+| **Hopper 6.4.2**  | x86/x86-64, ARM/ARM64 (incl. Mach-O, dylibs), and the container formats of Apple platforms | Weaker on MIPS/PPC/RISC-V. macOS `.app`/FAT binaries and FAT64 are handled by REA's Hopper loader preparation. 6.4.2 is the build REA 6.4.0 admits (launcher digest check). | `all`, `hopper` |
 
 Practical consequence: **Ghidra is the default** for anything unusual. REA's
 own docs cover the pinned profiles for MIPS (`MIPS:<LE|BE>:32:default`),
@@ -73,9 +79,10 @@ aarch64-linux-gnu-gcc -O2 -o /work/fixture-aarch64 /work/fixture.c
 mips-linux-gnu-gcc   -O2 -static -o /work/fixture-mips /work/fixture.c
 ```
 
-The verification harness does exactly this: it analyses
-x86-64, aarch64, armv7, MIPS32 BE, MIPS32 LE, RISC-V64, PowerPC and a Windows
-PE32+ through Ghidra on every run (`scripts/verify.sh --only analysis`).
+The verification harness does exactly this: on the images that carry Ghidra it
+analyses x86-64, aarch64, armv7, MIPS32 BE, MIPS32 LE, RISC-V64, PowerPC and a
+Windows PE32+ through Ghidra on every run (`scripts/verify.sh --only analysis`),
+and skips the rest with a reason on the other images.
 
 ## Limits worth knowing
 

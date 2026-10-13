@@ -24,7 +24,7 @@ thing that changes in everything below is the container name
 | `... --profile ida up -d rea-ida` | `rea-agent-ida` | none — your IDA | `ida`, once registered ([ida-variants.md](ida-variants.md)) |
 
 The single-engine images set `REA_ANALYSIS_PROVIDER` inside
-`/etc/rea/engine.env`, so the agent does not have to name an engine on every
+`/usr/local/share/rea/engine.env`, so the agent does not have to name an engine on every
 call. Override it with `REA_ANALYSIS_PROVIDER=…` in `config/rea.env` if the
 target needs a different one (an image with one engine simply reports the other
 as unavailable rather than guessing).
@@ -79,7 +79,7 @@ curl -sS -X POST http://127.0.0.1:8811/mcp \
 ```
 
 The bridge sidecar is engine-agnostic: it runs `rea mcp` from whichever image you
-give it, and that image's `/etc/rea/engine.env` supplies the engine paths, so it
+give it, and that image's `/usr/local/share/rea/engine.env` supplies the engine paths, so it
 carries any of the four engines (it no longer depends on a particular service
 being up).
 

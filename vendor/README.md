@@ -17,14 +17,16 @@ directory is ever committed (see `.gitignore`).
 ```bash
 # You own a Hopper licence and downloaded the licensed DEB:
 cp ~/Downloads/Hopper-6.4.2-Linux.deb vendor/
-docker compose build --build-arg HOPPER_DEB_URL= --no-cache rea-agent
+make build            # or: make build-hopper for the Hopper-only image
+# (equivalent to scripts/build.sh --engine all, which passes REA_UID/REA_GID too)
 ```
 
 The build prints which package it used. Verify with:
 
 ```bash
-docker compose exec rea-agent /opt/hopper/bin/Hopper --version || true
-docker compose exec rea-agent rea doctor --provider hopper --json
+docker compose --profile hopper up -d rea-hopper
+docker compose exec rea-hopper /opt/hopper/bin/Hopper --version || true
+docker compose exec rea-hopper rea doctor --provider hopper --json
 ```
 
 Hopper activation on Linux is interactive and operator-owned (REA deliberately
@@ -38,6 +40,8 @@ Preferred: bind-mount an existing installation instead of baking it in.
 ```bash
 echo "IDA_INSTALL_DIR=$HOME/ida-pro-9.4" >> .env
 mkdir -p config/ida && cp ~/ida.hexlic config/ida/
+make build-ida
+docker compose -f docker-compose.yml -f compose.ida.yml --profile ida up -d rea-ida
 ```
 
 Baking in is supported for reproducibility, but the resulting image must stay
@@ -48,5 +52,8 @@ mkdir -p vendor/ida
 cp ~/Downloads/ida-pro_94_x64linux.run vendor/ida/
 cp ~/ida.hexlic vendor/ida/
 echo "INSTALL_IDA=1" >> .env
-docker compose build rea-agent
+make build-ida            # or ENGINE=all, which also gains IDA
 ```
+
+Which IDA edition can drive REA headlessly (and which cannot) is in
+`docs/ida-variants.md`.

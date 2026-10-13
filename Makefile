@@ -120,8 +120,14 @@ test-host: ## run the harness in a throwaway container against ./work
 .PHONY: sizes
 sizes: ## report the size of every built engine image
 	@for e in all ghidra hopper ida; do \
-	  img="$$(echo $(call engine_image,$$e))"; \
-	  printf '%-28s %s\n' "$$img" "$$( $(DOCKER) image inspect "$$img" --format '{{.Size}}' 2>/dev/null || echo 'not built' )"; \
+	  case "$$e" in all) img="rea-agent:$(TAG_SUFFIX)" ;; *) img="rea-agent-$$e:$(TAG_SUFFIX)" ;; esac; \
+	  bytes="$$( $(DOCKER) image inspect "$$img" --format '{{.Size}}' 2>/dev/null || echo '' )"; \
+	  if [ -n "$$bytes" ]; then \
+	    human="$$(awk -v b="$$bytes" 'BEGIN{printf "%.2f GB", b/1024/1024/1024}')"; \
+	    printf '  %-38s %s (%s bytes)\n' "$$img" "$$human" "$$bytes"; \
+	  else \
+	    printf '  %-38s %s\n' "$$img" "not built"; \
+	  fi; \
 	done
 
 .PHONY: clean

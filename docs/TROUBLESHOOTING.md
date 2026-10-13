@@ -192,8 +192,8 @@ harness skip checks for engines the image does not ship, but a *manual*
 what it is:
 
 ```bash
-docker compose exec <service> cat /etc/rea/engine      # all | ghidra | hopper | ida
-docker compose exec <service> cat /etc/rea/engine.env  # the paths it advertises
+docker compose exec <service> cat /usr/local/share/rea/engine      # all | ghidra | hopper | ida
+docker compose exec <service> cat /usr/local/share/rea/engine.env  # the paths it advertises
 docker compose exec <service> rea providers --json
 ```
 
@@ -205,7 +205,7 @@ broad, Hopper x86/ARM/Apple formats). Use the `all` image, or run two engine
 containers named explicitly.
 
 **`docker exec` cannot find the engine although compose works**
-Engine paths come from `/etc/rea/engine.env` via the `/usr/local/bin/rea`
+Engine paths come from `/usr/local/share/rea/engine.env` via the `/usr/local/bin/rea`
 wrapper. If that wrapper is replaced - e.g. by running `npm install -g
 rea-agents` or `rea update` inside the container - the injection is lost. Rebuild
 the image (`scripts/build.sh --engine <engine>`) instead of updating REA in

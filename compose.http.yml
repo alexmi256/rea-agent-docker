@@ -31,7 +31,7 @@ services:
     ports:
       - "${REA_MCP_HTTP_BIND:-127.0.0.1}:${REA_MCP_HTTP_PORT:-8811}:8811"
     environment:
-      # The image's own /etc/rea/engine.env supplies the engine paths, so this
+      # The image's own /usr/local/share/rea/engine.env supplies the engine paths, so this
       # sidecar carries any engine. Override REA_ENGINE_* here only if you run
       # an engine path that differs from the image default.
       REA_ENGINE: ${REA_ENGINE:-all}

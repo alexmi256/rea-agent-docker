@@ -65,7 +65,7 @@ jobs:
       - name: Engine profile as the container sees it
         run: |
           docker run --rm "rea-agent-${{ matrix.engine }}:ci" \
-            bash -c 'echo "engine: $(cat /etc/rea/engine)"; cat /etc/rea/engine.env; rea --version'
+            bash -c 'echo "engine: $(cat /usr/local/share/rea/engine)"; cat /usr/local/share/rea/engine.env; rea --version'
 
       - name: Quick verification (tools + static analysis + MCP handshake)
         run: |

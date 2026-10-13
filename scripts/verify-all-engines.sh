@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Verify every built engine image with the same harness, then report the
-# per-engine result. The harness is engine-aware (it reads /etc/rea/engine), so
+# per-engine result. The harness is engine-aware (it reads /usr/local/share/rea/engine), so
 # each image is checked for what it actually carries and skips the rest.
 #
 #   scripts/verify-all-engines.sh                 # full harness on all four
@@ -14,7 +14,10 @@ set -uo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINES="all ghidra hopper ida"
-QUICK=0
+# NOTE: use an empty default, not 0 - `${QUICK:+--quick}` tests for a *set and
+# non-empty* variable, so QUICK=0 would expand to --quick and silently run the
+# fast profile for every engine.
+QUICK=""
 PASSTHROUGH=()
 
 while [ $# -gt 0 ]; do

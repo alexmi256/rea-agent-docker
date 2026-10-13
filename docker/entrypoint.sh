@@ -83,7 +83,7 @@ fi
 [ -n "${REA_JEB_MCP_URL:-}" ] && log "JEB MCP endpoint: ${REA_JEB_MCP_URL}"
 
 # --- 5. startup summary -------------------------------------------------------
-engine="$(cat /etc/rea/engine 2>/dev/null || echo all)"
+engine="$(cat /usr/local/share/rea/engine 2>/dev/null || echo all)"
 log "engine profile: ${engine}"
 if [ "$engine" = "ida" ] && [ -z "${REA_IDA_MCP_CONFIG:-}" ]; then
     log "note: this image bundles no analysis engine. Provide IDA + a registration:"

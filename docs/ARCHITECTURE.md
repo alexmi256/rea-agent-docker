@@ -40,7 +40,7 @@ reuses every shared layer from cache. Notable orderings and pins:
 | **17a** | **Ghidra** + native decompiler for `linux_x86_64` (JDK 21 is layer 1 and lives in every image) — `REA_ENGINE=all\|ghidra` | Ghidra 12.1.4 |
 | **17b** | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime — `REA_ENGINE=all\|hopper` | Hopper 6.4.2 Linux |
 | **17c** | optional in-image **IDA**, only from `vendor/ida/*.run` — `REA_ENGINE=all\|ida` | off by default |
-| **17d** | **engine configuration**: `/etc/rea/engine`, `/etc/rea/engine.env`, and the `rea` wrapper that sources it | - |
+| **17d** | **engine configuration**: `/usr/local/share/rea/engine`, `/usr/local/share/rea/engine.env`, and the `rea` wrapper that sources it | - |
 
 ## Environment contract
 
@@ -61,12 +61,12 @@ REA_BROWSER_NO_SANDBOX, PLAYWRIGHT_BROWSERS_PATH, REA_MCP_INPUT_SCHEMA_PROFILE
 REA_ENGINE
 ```
 
-Engine paths, set per image in `/etc/rea/engine.env` and injected by the `rea`
+Engine paths, set per image in `/usr/local/share/rea/engine.env` and injected by the `rea`
 wrapper (`/usr/local/bin/rea` → `rea-npm-shim`), so an image never advertises an
 engine it does not have:
 
 ```
-REA_ENGINE=all|ghidra|hopper|ida        # also written to /etc/rea/engine
+REA_ENGINE=all|ghidra|hopper|ida        # also written to /usr/local/share/rea/engine
 GHIDRA_INSTALL_DIR=/opt/ghidra          # all, ghidra
 HOPPER_LAUNCHER_PATH, HOPPER_STATE_DIR  # all, hopper
 IDADIR=/opt/ida                         # all, ida
@@ -77,7 +77,7 @@ Runtime-only overrides belong in `config/rea.env` (loaded by compose's
 `env_file`) or in compose `environment:` (applies to `docker exec` too).
 `docker run`/`docker exec` without compose still get the engine paths, because
 the wrapper reads the file. The healthcheck, the entrypoint and the verification
-harness all read `/etc/rea/engine` to decide which checks apply.
+harness all read `/usr/local/share/rea/engine` to decide which checks apply.
 
 ## Filesystem layout
 
@@ -94,8 +94,8 @@ harness all read `/etc/rea/engine` to decide which checks apply.
 /opt/rea/verify             verification harness (engine-aware)
 /opt/rea/assets             IDA MCP registration templates
 /opt/rea/scripts            setup-ida-mcp.sh
-/etc/rea/engine             engine marker: all | ghidra | hopper | ida
-/etc/rea/engine.env         engine paths + default REA_ANALYSIS_PROVIDER
+/usr/local/share/rea/engine             engine marker: all | ghidra | hopper | ida
+/usr/local/share/rea/engine.env         engine paths + default REA_ANALYSIS_PROVIDER
 /usr/local/bin/rea          wrapper that sources engine.env, then the npm shim
 /work                       analysis workspace (mounted from ./work)
 /targets                    read-only sample drop-box (mounted from ./targets)
