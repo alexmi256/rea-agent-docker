@@ -24,7 +24,7 @@ engineering without installing a single tool on the host.
 * **Published to GHCR:** all four are built and pushed to
   `ghcr.io/alexmi256/…` on every push to `main`, so `docker compose pull` works
   without building anything ([below](#a-pull-a-published-image-recommended--no-build)).
-* **Surface:** REA's MCP server, ~170 tools, stdio by default (spawned by the
+* **Surface:** REA's MCP server, ~207 tools, stdio by default (spawned by the
   client through `docker exec`) or Streamable HTTP via an optional bridge.
 * **Verified:** the image ships a harness that actually runs the engines —
   `scripts/verify.sh` builds fixtures for eight architectures/format families
@@ -47,10 +47,10 @@ Images are published to the GitHub Container Registry on every push to `main`:
 
 | Image | Engine |
 | ----- | ------ |
-| `ghcr.io/alexmi256/rea-agent:6.4.0-linux-amd64` | Ghidra + Hopper |
-| `ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64` | Ghidra only |
-| `ghcr.io/alexmi256/rea-agent-hopper:6.4.0-linux-amd64` | Hopper only |
-| `ghcr.io/alexmi256/rea-agent-ida:6.4.0-linux-amd64` | no engine (bring your own IDA) |
+| `ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64` | Ghidra + Hopper |
+| `ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64` | Ghidra only |
+| `ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64` | Hopper only |
+| `ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64` | no engine (bring your own IDA) |
 
 Each also carries a `:latest` tag. The packages are public — no login, no token,
 just:
@@ -120,7 +120,7 @@ Full walkthrough: [docs/HERMES-MCP.md](docs/HERMES-MCP.md).
 
 | Family | Tools | Pinned |
 | ------ | ----- | ------ |
-| REA | `rea-agents` CLI + MCP server | 6.4.0 (Node 24.21.0) |
+| REA | `rea-agents` CLI + MCP server | 6.5.0 (Node 24.21.0) |
 | Native engines | Ghidra + JDK 21, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.1.4, Hopper 6.4.2 |
 | ELF/core analysis | pwntools + pyelftools + Unicorn in a venv, `gdb` + `gdb-multiarch`, pwndbg | pwntools 4.15.0, pyelftools 0.33, Unicorn 2.1.2, pwndbg 2026.09.15 |
 | Firmware | binwalk (built from source), unblob + extractors (`debugfs`, 7z, squashfs, cpio, dtc, lz4/lzop/lzip, cabextract, ...) | binwalk 3.1.0, unblob 26.6.4 |
@@ -260,7 +260,7 @@ Phases:
 | `static` | `inspect-binary-layout` (pwntools), `inspect-wasm-artifact` (WABT), `inspect-sqlite-database`, `inspect-managed-artifact`/`-members` (.NET), `inspect-plist`, `inspect-evm-interface`, `analyze-javascript-application`, `import-reference-source` |
 | `capture` | tshark pcap fields/summary, sigrok VCD decode, binwalk regions, unblob extraction, HAR + a **real mitmdump capture**, Chrome CDP target discovery/page/screenshot capture, Playwright scenario (launch+click+DOM), PTY process capture |
 | `clients` | Frida device inventory, adb client/devices, Apktool launcher, JADX engine JAR, IDA registration acceptance, JEB endpoint, Hopper state dir |
-| `mcp` | a real MCP client (`docker/verify/mcp-probe.mjs`): `initialize` → `tools/list` (~170 tools) → `tools/call` on the first engine-free tool the *installed release* advertises (on 6.4.0 that is `inspect_binary_layout`; SQLite/WASM/Go are `main`-only) → where the image has an engine, `open_binary` + `analyze_function` + `close_binary` through it; then the Streamable HTTP bridge is started and initialised over HTTP |
+| `mcp` | a real MCP client (`docker/verify/mcp-probe.mjs`): `initialize` → `tools/list` (~207 tools) → `tools/call` on the first engine-free tool the *installed release* advertises (currently `inspect_binary_layout`) → where the image has an engine, `open_binary` + `analyze_function` + `close_binary` through it; then the Streamable HTTP bridge is started and initialised over HTTP |
 
 Reports land in `work/verify-reports/<timestamp>/` — `summary.txt` plus raw
 stdout/stderr per check in `logs/`, so a failure is always inspectable.
@@ -270,10 +270,10 @@ stdout/stderr per check in `logs/`, so a failure is always inspectable.
 See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) — the recorded per-engine
 sweep with the exact commands and pass/fail/skip tables, and
 [`docs/verify-engines.txt`](docs/verify-engines.txt) for the raw per-engine summaries.
-Final sweep (full harness, one run per image): `all` 96 passed / 0 failed / 14
-skipped, `ghidra` 85/0/18, `hopper` 79/0/16, `ida` 72/0/19 — every image
-exited 0, and every skip is conditional (engine absent from that image, release
-catalog, refused ELF machine, unlicensed IDA/JEB).
+Final sweep (full harness, one run per image): `all` 107 passed / 0 failed / 3
+skipped, `ghidra` 95/0/8, `hopper` 88/0/7, `ida` 80/0/11 — every image
+exited 0, and every skip is conditional (engine absent from that image,
+unlicensed IDA/JEB, Apple-platform plist routing).
 
 ---
 
@@ -299,7 +299,7 @@ catalog, refused ELF machine, unlicensed IDA/JEB).
   falls back to a plain local name. The Makefile, `scripts/build.sh`,
   `scripts/verify.sh` and compose all use it, so what you build, what you verify
   and what you pull are never different names. CI fails if they drift.
-* **Tool-catalog size.** REA ships ~170 tools. The image defaults to
+* **Tool-catalog size.** REA ships ~207 tools. The image defaults to
   `REA_MCP_INPUT_SCHEMA_PROFILE=compact` (~290 KB vs ~496 KB of schema per
   request); set `full` if a client needs complete nested schemas.
 * **Everything is Linux.** Several REA families (process capture, packet and

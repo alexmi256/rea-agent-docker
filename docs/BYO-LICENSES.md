@@ -35,7 +35,7 @@ chooses demo mode itself). Demo limits: no save/export, no debugger backend,
 the launcher binary and compares it against the launcher digests of the one
 Linux package it was validated with per package family
 (`SUPPORTED_RELEASES`/`SUPPORTED_HOPPER_SHA256` in
-`src/application/LinuxHopper.ts`). For REA 6.4.0 that is **Hopper 6.4.2
+`src/application/LinuxHopper.ts`). For REA 6.5.0 that is **Hopper 6.4.2
 (Linux demo)**. A different build makes `rea doctor --provider hopper --json`
 report `hopper-version` as `config_drift`.
 
@@ -45,7 +45,7 @@ it:
 
 ```bash
 # inside the image - this is the build's own step; a host shell has no REA:
-docker run --rm --entrypoint sh rea-agent-hopper:6.4.0-linux-amd64 -c \
+docker run --rm --entrypoint sh rea-agent-hopper:6.5.0-linux-amd64 -c \
   'grep -rohE "Hopper-[0-9.]+-Linux-demo[.]deb" "$(npm root -g)/rea-agents/dist" | head -1'
 ```
 
@@ -53,7 +53,7 @@ The launcher digest is printed by the build log
 (`Hopper launcher sha256: 0294ced1…`) and is in REA's supported set.
 
 ```bash
-# default (public demo 6.4.2 - the build REA 6.4.0 pins) - what compose does
+# default (public demo 6.4.2 - the build REA 6.5.0 pins) - what compose does
 make build            # the all-engines image
 make build-hopper     # the Hopper-only image
 

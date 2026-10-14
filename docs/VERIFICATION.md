@@ -3,7 +3,7 @@
 Commands:
 
 ```bash
-scripts/verify.sh --image rea-agent-ghidra:6.4.0-linux-amd64   # one engine image
+scripts/verify.sh --image rea-agent-ghidra:6.5.0-linux-amd64   # one engine image
 scripts/verify-all-engines.sh                                  # all four, one table
 make verify ENGINE=hopper                                      # same, via make
 ```
@@ -25,7 +25,7 @@ single-engine image gives up.
 | ---- | ------ |
 | Runtime | Node 24.x, REA `--version`, `rea providers`, provider discovery for the engines present |
 | Engine profile | `/usr/local/share/rea/engine` marker, `engine.env` content, the `rea` wrapper that injects it, and that the container **healthcheck** calls this image healthy (shallow and deep) |
-| Ghidra (images that carry it) | `doctor --provider ghidra` healthy; analysis of x86-64, AArch64, ARMv7, MIPS32 (BE + LE), RISC-V64, PowerPC and a Windows PE32+; `function`/`decompile`/`search`/`instructions` on the x86-64 fixture; skips RISC-V64/PowerPC fixture *search* when the release refuses that ELF machine |
+| Ghidra (images that carry it) | `doctor --provider ghidra` healthy; analysis of x86-64, AArch64, ARMv7, MIPS32 (BE + LE), RISC-V64, PowerPC and a Windows PE32+; `function`/`decompile`/`search`/`instructions` on the x86-64 fixture; a refusal of any ELF machine the release does not admit is reported as SKIP-with-reason, not failure |
 | Hopper (images that carry it) | `doctor --provider hopper` healthy; headless demo-mode analysis, decompilation and string search of the x86-64 fixture (private Xvfb display) |
 | Static | `inspect-binary-layout` (pwntools 4.15.0), `inspect-sqlite-database`-family routing, `inspect-managed-artifact`/`-members` (.NET + a real ilspycmd decompile), `inspect-evm-interface`, `analyze-javascript-application`, `import-reference-source`, zip-bundle `inspect-artifact`/`extract-artifact`, application-directory `analyze` |
 | Capture | `inspect-packet-capture` (tshark 4.2.2), signal decoding (sigrok-cli 0.7.2), `inspect-firmware-regions` (binwalk 3.1.0) + `extract-firmware` (unblob 26.6.4), web-network-capture for HAR and for a **live mitmdump 12.2.3 capture**, Chrome CDP target/page/screenshot, Playwright launch→click→DOM, PTY `capture-process` |
@@ -41,15 +41,20 @@ implies — that is the point of the split:
 
 | Engine | Image | Passed | Failed | Skipped | Notable skips |
 | ------ | ----- | -----: | -----: | ------: | ------------- |
-| `all` | `rea-agent` | 96 | 0 | 14 | IDA/JEB (no licence configured), RISC-V64/PowerPC ELF admission, families absent from REA 6.4.0, playbook-managed .NET/plist routing |
-| `ghidra` | `rea-agent-ghidra` | 85 | 0 | 18 | as above **+ the Hopper checks** (not in this image) |
-| `hopper` | `rea-agent-hopper` | 79 | 0 | 16 | as above **+ the Ghidra multi-arch checks** (not in this image) |
-| `ida` | `rea-agent-ida` | 72 | 0 | 19 | **all native analysis** (no engine bundled — register IDA to enable it), plus the `all` column's skips |
+| `all` | `rea-agent` | 107 | 0 | 3 | IDA/JEB (no licence configured), Apple-platform plist routing |
+| `ghidra` | `rea-agent-ghidra` | 95 | 0 | 8 | as above **+ the Hopper checks** (not in this image) |
+| `hopper` | `rea-agent-hopper` | 88 | 0 | 7 | as above **+ the Ghidra multi-arch checks** (not in this image) |
+| `ida` | `rea-agent-ida` | 80 | 0 | 11 | **all native analysis** (no engine bundled — register IDA to enable it), plus the `all` column's skips |
 
-Run ids: `20261013T202729Z` (all), `20261013T203914Z` (ghidra),
-`20261013T205026Z` (hopper), `20261013T205217Z` (ida) — full per-check logs in
+Run ids: `20261014T203245Z` (all), `20261014T204424Z` (ghidra),
+`20261014T205559Z` (hopper), `20261014T205739Z` (ida) — full per-check logs in
 `work/verify-reports/<run-id>/logs/`, summarised in
 [`docs/verify-engines.txt`](verify-engines.txt). Every image exited 0.
+
+The skip count dropped from 14 (`all`) to 3 with the 6.5.0 bump because the
+previously `main`-only families (sqlite, wasm, go, pcap, signal, frida) are now
+released and run for real. `plist` is the only non-engine, non-licence skip
+left on a full-featured image.
 
 Machine-checked facts that hold independently of the harness (checked on each
 image after the engine split):
@@ -69,9 +74,9 @@ image after the engine split):
   `ida` → shallow `healthy`, deep reports
   `unhealthy: engine=ida but REA_IDA_MCP_CONFIG is not set`, which is the correct
   answer for an unconfigured, engine-less image.
-* `rea mcp` answers MCP `initialize` (server `rea 6.4.0`, protocol
+* `rea mcp` answers MCP `initialize` (server `rea 6.5.0`, protocol
   `2025-06-18`, capabilities tools/completions/prompts) and advertises
-  **170 tools** on every image (the catalog does not depend on the engine).
+  **207 tools** on every image (the catalog does not depend on the engine).
 * `ilspycmd 8.2.0.7535` runs (net6.0 app; the image sets
   `DOTNET_ROLL_FORWARD=Major`).
 * frida binding: `getLocalDevice()` → "Local System".
@@ -80,34 +85,44 @@ image after the engine split):
 
 * `ida doctor`, `jeb client` — skipped unless `REA_IDA_MCP_CONFIG` /
   `REA_JEB_MCP_URL` are provided (bring-your-own commercial engines).
+* `plist decode` — REA routes plists through its Apple-platform composite
+  provider, which is `capability_unavailable` on Linux for this input.
 * Every native-analysis check on `rea-agent-ida` — that image ships no engine by
   design; the harness reports it instead of failing.
 * Ghidra checks on `rea-agent-hopper`, Hopper checks on `rea-agent-ghidra`.
 * any fixture whose toolchain was switched off at build time
   (`--arg INSTALL_CROSS_TOOLCHAINS=0`, `INSTALL_CHROME=0`, …).
 
-## Two different catalogs: the release vs. `main`
+## Release awareness: the catalog is read, not assumed
 
-REA's repository `main` documents more families than the published npm package.
-Checks use `check_rea`, which SKIPs (never fails) a family the *installed*
-release does not expose. For **REA 6.4.0** the released CLI/MCP **lacks**:
+REA's repository `main` and the published npm package can differ. Checks
+therefore use `check_rea`, which reads `rea --help` from the *installed* release
+and SKIPs (never fails) any family that release does not expose — so the harness
+stays valid across a `REA_VERSION` bump without edits.
 
-`inspect-sqlite-database`, `inspect-wasm-artifact`, `inspect-go-binary`,
+**REA 6.5.0 closed the gap that earlier releases had.** The families below were
+`main`-only through 6.4.0 and are now part of the released CLI/MCP, so the
+harness runs them for real rather than skipping:
+
+`inspect-sqlite-database`, `inspect-wasm-artifact`, `compare-wasm-interfaces`,
+`inspect-go-binary`, `inspect-rust-binary`, `inspect-electron-fuses`,
 `inspect-pcap-client`, `inspect-pcap-capture`, `inspect-packet-capture`,
-`inspect-signal-decoders`, `decode-signal-recording`, `list-frida-devices`
-(the frida family is on `main`; the frida *binding* is installed and verified).
+`inspect-packet-fields`, `inspect-signal-decoders`, `decode-signal-recording`,
+`list-frida-devices`, `list-frida-processes`, `instrument-with-frida`.
 
-Their tooling (WABT, SQLite, TShark, sigrok-cli, frida) is nonetheless present
-and exercised directly, so a later `REA_VERSION` build arg immediately gains
-those checks.
+Their tooling (WABT 1.0.42, Node's built-in SQLite, TShark, sigrok-cli 0.7.2,
+frida 17.23.2) was already in the image, so no dependency changed for this —
+only `REA_VERSION`.
 
-## Target-admission limits observed on REA 6.4.0
+## Target admission on REA 6.5.0
 
-* **RISC-V64 and PowerPC ELF** fixtures are refused with
-  `target_unavailable: unsupported ELF architecture` — the release's artifact
-  admission does not accept those `e_machine` values. Ghidra itself is fine:
-  x86-64, AArch64, ARMv7, MIPS32 BE/LE and PE32+ all import, analyse, search
-  and decompile. The harness reports these as SKIP-with-reason, not failure.
+* **RISC-V64 and PowerPC ELF are now admitted.** Through 6.4.0 the harness
+  recorded these fixtures as refused with `target_unavailable: unsupported ELF
+  architecture`; 6.5.0 adds bounded Ghidra RISC-V and PowerPC profiles, so the
+  fixture string is now found on every architecture the harness builds for —
+  x86-64, AArch64, ARMv7, MIPS32 BE/LE, RISC-V64, PowerPC, Windows PE32+.
+  The harness still reports any future `unsupported ELF architecture` refusal as
+  SKIP-with-reason rather than failure, so the check stays honest either way.
 * **Browser views must be HTTP(S) origin pages** — `file://` is refused
   (`target_not_allowed`), so the fixture page is served on
   `http://127.0.0.1:8099` for the CDP and Playwright checks.
@@ -124,7 +139,8 @@ those checks.
 | per-engine full sweep (first, pre-healthcheck-fix images) | all 94/0/14 · ghidra 83/0/18 · hopper 77/0/16 · ida 70/0/19 — **0 failures on all four**; it also caught the leftovers that are now fixed (healthcheck demanding Hopper on every image, `engine.env` shadowed by the `./config` mount, `set -u` aborts on single-engine images) |
 | per-engine full sweep (final images) | see `docs/verify-engines.txt` |
 | **CI, GitHub-hosted runner (quick profile)** | **59 passed / 0 failed / 13 skipped** — run [38474640500](https://github.com/alexmi256/rea-agent-docker/actions/runs/38474640500), ghidra image built on the runner in 8m52s, harness executed as the runner's uid (not the image's), artifact `verification-report-ghidra` uploaded. This run is also the regression test for the two defects CI found: the entrypoint dying on a foreign uid, and the un-gated Hopper state-dir check. |
-| **CI publish run (all four)** | run [38481777484](https://github.com/alexmi256/rea-agent-docker/actions/runs/38481777484) — every engine image built on a hosted runner (ida 10m0s, hopper 9m10s, ghidra 11m42s, all-engines longest), quick harness green on each, then published to `ghcr.io/alexmi256/rea-agent[-ghidra\|-hopper\|-ida]` with tags `6.4.0-linux-amd64` and `latest`. Public access verified independently of the CI log: `docker manifest inspect` on all four tags succeeds **anonymously** (no `ghcr.io` credentials on the machine doing the check). |
+| **CI publish run (all four, REA 6.4.0)** | run [38481777484](https://github.com/alexmi256/rea-agent-docker/actions/runs/38481777484) — every engine image built on a hosted runner (ida 10m0s, hopper 9m10s, ghidra 11m42s, all-engines longest), quick harness green on each, then published to `ghcr.io/alexmi256/rea-agent[-ghidra\|-hopper\|-ida]` with tags `6.4.0-linux-amd64` and `latest`. Public access verified independently of the CI log: `docker manifest inspect` on all four tags succeeds **anonymously** (no `ghcr.io` credentials on the machine doing the check). |
+| **Local per-engine sweep, REA 6.5.0 (this bump)** | all 107/0/3 · ghidra 95/0/8 · hopper 88/0/7 · ida 80/0/11 — **0 failures on all four**, exit 0 on every image. The first pass caught one harness defect (`sigrok decoder inventory` asserted `uart` appeared in the decoder catalog's default 50-of-111 page); fixed by searching with `inspect-signal-decoders --query uart` and re-run. Also newly green relative to 6.4.0: sqlite, wasm, go-binary, pcap ×3, signal ×2, frida, and the RISC-V64/PowerPC ELF searches. |
 
 The committed summary of the last full single-image run is in
 [`docs/verify-summary.txt`](verify-summary.txt); the per-engine table from the

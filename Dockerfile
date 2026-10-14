@@ -34,7 +34,7 @@ FROM ubuntu:24.04 AS rea-agent
 ARG DEBIAN_FRONTEND=noninteractive
 
 # --- pinned upstream versions ------------------------------------------------
-ARG REA_VERSION=6.4.0
+ARG REA_VERSION=6.5.0
 ARG NODE_VERSION=24.21.0
 # REA declares frida as an optional dependency (JS instrumentation). npm 11
 # blocks package install scripts by default, so frida's native binding is
@@ -44,7 +44,7 @@ ARG GHIDRA_VERSION=12.1.4
 ARG GHIDRA_ZIP=ghidra_12.1.4_PUBLIC_20260921.zip
 ARG GHIDRA_SHA256=
 ARG GHIDRA_BASE_URL=https://github.com/NationalSecurityAgency/ghidra/releases/download
-# Hopper: REA 6.4.0 admits ONE Linux build per package family, matched by the
+# Hopper: REA 6.5.0 admits ONE Linux build per package family, matched by the
 # launcher's SHA-256 (src/application/LinuxHopper.ts -> SUPPORTED_RELEASES/
 # SUPPORTED_HOPPER_SHA256). Its pinned demo package is Hopper 6.4.2. Leave
 # HOPPER_DEB_URL empty to derive that filename straight out of the installed

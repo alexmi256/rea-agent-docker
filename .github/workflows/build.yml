@@ -266,6 +266,7 @@ jobs:
           mkdir -p work config
           docker run --rm --shm-size=1g \
             --user "$(id -u):$(id -g)" \
+            -e "REA_IMAGE_ID=$LOCAL_IMAGE" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
             "$LOCAL_IMAGE" /opt/rea/verify/verify-all.sh --quick
 
@@ -274,6 +275,7 @@ jobs:
         run: |
           docker run --rm --shm-size=4g \
             --user "$(id -u):$(id -g)" \
+            -e "REA_IMAGE_ID=$LOCAL_IMAGE" \
             -v "$PWD/work:/work" -v "$PWD/config:/etc/rea:ro" \
             "$LOCAL_IMAGE" /opt/rea/verify/verify-all.sh
 

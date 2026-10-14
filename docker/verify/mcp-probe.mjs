@@ -2,10 +2,10 @@
 // `docker exec -i <container> rea mcp`.
 //
 //   1. initialize            -> server identity + protocol version
-//   2. tools/list            -> the tool catalog (REA ships 170+ tools)
+//   2. tools/list            -> the tool catalog (REA ships 200+ tools)
 //   3. tools/call            -> a real, engine-free inspection (the first tool the
-//                              installed release advertises: inspect_binary_layout
-//                              on 6.4.0, whose SQLite/WASM probes are main-only)
+//                              installed release advertises: inspect_binary_layout,
+//                              with the SQLite and managed probes as fallbacks)
 //   4. optional: open a binary through a provider, analyse, close
 //
 // Prints a JSON summary on stdout; exits non-zero on any protocol failure.

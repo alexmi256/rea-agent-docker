@@ -6,7 +6,7 @@
 #   scripts/verify.sh --quick              # tool presence, static analysis, MCP handshake
 #   scripts/verify.sh --only tools,mcp
 #   scripts/verify.sh --engine hopper      # whatever image that engine resolves to
-#   scripts/verify.sh --image ghcr.io/<owner>/rea-agent-hopper:6.4.0-linux-amd64
+#   scripts/verify.sh --image ghcr.io/<owner>/rea-agent-hopper:6.5.0-linux-amd64
 #   scripts/verify.sh --compose --service rea-ghidra   # exec inside a compose service
 # =============================================================================
 set -euo pipefail
@@ -81,9 +81,12 @@ CONFIG="$(host_path "$PROJECT_DIR/config")"
 # Run as the host user that owns ./work, so reports and /work stay readable.
 # REA_UID/REA_GID come from .env when present; the image user is uid 1000.
 RUN_USER="${REA_UID:-$(id -u)}:${REA_GID:-$(id -g)}"
+# Name the image in the summary: the harness reads REA_IMAGE_ID, and its own
+# fallback (/etc/rea/image-id) is hidden here because /etc/rea is bind-mounted.
 echo "running harness in $IMAGE as $RUN_USER"
 exec "$DOCKER" run --rm -i --shm-size=1g \
     --user "$RUN_USER" \
+    -e "REA_IMAGE_ID=$IMAGE" \
     -v "$WORK:/work" \
     -v "$CONFIG:/etc/rea:ro" \
     "$IMAGE" /opt/rea/verify/verify-all.sh ${ARGS[@]+"${ARGS[@]}"}

@@ -7,10 +7,10 @@ build time. So this project builds one image per engine, from one Dockerfile:
 
 | Image | `REA_ENGINE` | Native engine | Auxiliary toolchain | Use it when |
 | --- | --- | --- | --- | --- |
-| `rea-agent:6.4.0-linux-amd64` | `all` | Ghidra **+** Hopper | full | you want everything in one container, or you want to compare engines on one target |
-| `rea-agent-ghidra:6.4.0-linux-amd64` | `ghidra` | Ghidra 12.1.4 | full | you analyse many architectures (the usual case) |
-| `rea-agent-hopper:6.4.0-linux-amd64` | `hopper` | Hopper (demo or your licensed DEB) | full | you prefer Hopper's output, or you own a Hopper licence |
-| `rea-agent-ida:6.4.0-linux-amd64` | `ida` | **none bundled** - bring your own IDA | full | you own IDA and want REA to drive it (see [ida-variants.md](ida-variants.md)) |
+| `rea-agent:6.5.0-linux-amd64` | `all` | Ghidra **+** Hopper | full | you want everything in one container, or you want to compare engines on one target |
+| `rea-agent-ghidra:6.5.0-linux-amd64` | `ghidra` | Ghidra 12.1.4 | full | you analyse many architectures (the usual case) |
+| `rea-agent-hopper:6.5.0-linux-amd64` | `hopper` | Hopper (demo or your licensed DEB) | full | you prefer Hopper's output, or you own a Hopper licence |
+| `rea-agent-ida:6.5.0-linux-amd64` | `ida` | **none bundled** - bring your own IDA | full | you own IDA and want REA to drive it (see [ida-variants.md](ida-variants.md)) |
 
 **The auxiliary toolchain is identical in all four.** Firmware extraction
 (binwalk, unblob, 7z/cpio/squashfs/sleuthkit/mtools, binfmt+qemu), capture
@@ -51,10 +51,10 @@ Container Registry by CI on every push to `main`, and the packages are **public*
 
 | Image | Engine | Tags |
 | --- | --- | --- |
-| `ghcr.io/alexmi256/rea-agent` | Ghidra + Hopper | `6.4.0-linux-amd64`, `latest` |
-| `ghcr.io/alexmi256/rea-agent-ghidra` | Ghidra | `6.4.0-linux-amd64`, `latest` |
-| `ghcr.io/alexmi256/rea-agent-hopper` | Hopper | `6.4.0-linux-amd64`, `latest` |
-| `ghcr.io/alexmi256/rea-agent-ida` | no engine (BYO IDA) | `6.4.0-linux-amd64`, `latest` |
+| `ghcr.io/alexmi256/rea-agent` | Ghidra + Hopper | `6.5.0-linux-amd64`, `latest` |
+| `ghcr.io/alexmi256/rea-agent-ghidra` | Ghidra | `6.5.0-linux-amd64`, `latest` |
+| `ghcr.io/alexmi256/rea-agent-hopper` | Hopper | `6.5.0-linux-amd64`, `latest` |
+| `ghcr.io/alexmi256/rea-agent-ida` | no engine (BYO IDA) | `6.5.0-linux-amd64`, `latest` |
 
 ```bash
 # the compose defaults are already these names, so:
@@ -62,7 +62,7 @@ docker compose pull                       # only the active profiles' services (
 docker compose --profile ghidra up -d rea-ghidra   # pulls that image on demand
 
 # or, explicitly per engine
-docker pull ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64
+docker pull ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64
 make pull ENGINE=hopper                   # same thing via the Makefile
 make pull-all                             # all four (~8 GB each)
 make sizes                                # what you now have locally, with sizes
@@ -75,9 +75,9 @@ name), and `docker compose exec rea-ghidra rea doctor --json` works immediately.
 Notes:
 
 * **`latest` is per image, not per repo.** There is no "one latest": each engine
-  image tracks its own newest build, and the version tag (`6.4.0-linux-amd64`)
+  image tracks its own newest build, and the version tag (`6.5.0-linux-amd64`)
   is what you should pin in anything reproducible.
-* **Air-gapped transfer.** `docker save ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64 | gzip > rea-ghidra.tgz`
+* **Air-gapped transfer.** `docker save ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64 | gzip > rea-ghidra.tgz`
   then `docker load < rea-ghidra.tgz` on the other side.
 * **The images are ~8 GB each** and most of that is the auxiliary toolchain, not
   the engine — see the size table below for the per-engine deltas.
@@ -161,7 +161,7 @@ against the same workspace, or two analyses will race over the same files.
 docker exec -i rea-agent-ghidra rea mcp
 
 # Streamable HTTP bridge on 127.0.0.1:8811
-REA_IMAGE=rea-agent-ghidra:6.4.0-linux-amd64 REA_ENGINE=ghidra \
+REA_IMAGE=rea-agent-ghidra:6.5.0-linux-amd64 REA_ENGINE=ghidra \
   docker compose -f docker-compose.yml -f compose.http.yml --profile ghidra up -d rea-mcp-http
 make http-up ENGINE=hopper     # same thing, for the image you built
 ```
@@ -225,7 +225,7 @@ corresponding family as unavailable, which is honest and expected.
   the candidates rather than guessing).
 - To compare engines without rebuilding, run two containers with explicit names
   and separate home volumes, e.g. `docker run --name rea-g -v ./work:/work …
-  rea-agent-ghidra:6.4.0-linux-amd64 sleep infinity` alongside the Hopper one.
+  rea-agent-ghidra:6.5.0-linux-amd64 sleep infinity` alongside the Hopper one.
 - Hopper's architecture coverage is narrower than Ghidra's (Ghidra ships MIPS,
   RISC-V, PowerPC, SuperH, 6502, Z80, DOS MZ, and more in the same image). If
   architecture breadth is the reason you are shopping, the Ghidra image is the

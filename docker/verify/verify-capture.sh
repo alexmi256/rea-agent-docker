@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Phase 4 - runtime/capture families: firmware, HTTP captures, a real browser
-# through CDP, a Playwright scenario, and PTY process capture. Packet and signal
-# families are attempted as well and SKIPPED when the installed REA release does
-# not expose them (they are on repository main, not in 6.4.0).
+# through CDP, a Playwright scenario, and PTY process capture. The packet and
+# signal families ship with REA 6.5.0 and now run for real; check_rea still
+# SKIPs any family a future release does not expose.
 set -uo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
@@ -114,7 +114,11 @@ fi
 
 section "recorded signals (sigrok-cli 0.7.2 + libsigrokdecode)"
 if [ -s "$FIX/uart.vcd" ]; then
-    check_rea "sigrok decoder inventory" inspect-signal-decoders "uart" -- --json
+    # The decoder catalog is sorted and paginated (default --limit 50) and
+    # libsigrokdecode ships ~111 decoders, so `uart` sorts past the first page:
+    # search for it rather than relying on its position in the default window.
+    check_rea "sigrok decoder inventory" inspect-signal-decoders '"id":"uart"' \
+        -- --query uart --json
     check_rea "vcd UART decode" decode-signal-recording "R|E|A|uart" \
         -- "$FIX/uart.vcd" --decoders "uart:rx=rx:baudrate=9600" \
            --input_format vcd --annotations uart=rx_data --format json

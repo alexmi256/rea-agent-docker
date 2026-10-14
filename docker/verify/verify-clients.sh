@@ -9,15 +9,15 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIX="$REA_VERIFY_FIXTURES"
 
 section "Frida (JS instrumentation)"
-# REA 6.4.0 (npm release) exposes no frida tools yet - the family is on
-# repository main. The binding itself is installed and functional so a future
-# REA release picks it up without an image change.
+# REA 6.5.0 is the first release to expose the frida family (list-frida-devices,
+# list-frida-processes, instrument-with-frida). The binding was already installed
+# and functional in this image, so no image change was needed to pick it up.
 check "frida binding resolves from REA" "local device|frida" \
     -- bash -c "cd \"\$(npm root -g)/rea-agents\" && node -e 'const f=require(\"frida\");f.getLocalDevice().then(d=>console.log(\"frida local device:\",d.name))'"
 if rea --help 2>/dev/null | grep -qi frida; then
     check "rea frida device inventory" "local|device" -- rea list-frida-devices --json
 else
-    _skip "rea frida commands" "not part of the REA 6.4.0 release (present on main)"
+    _skip "rea frida commands" "not exposed by REA $(rea --version 2>/dev/null)"
 fi
 section "Android: adb + Apktool + JADX engine"
 check "adb client inspection" "adb|version" -- rea inspect-adb-client --json

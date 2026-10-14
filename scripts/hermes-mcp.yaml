@@ -33,7 +33,7 @@ mcp_servers:
       # (/usr/local/share/rea/engine.env), so it is usually redundant here.
       # REA_ANALYSIS_PROVIDER: "ghidra"
       #
-      # REA advertises ~170 tools. `compact` (the image default) trims the
+      # REA advertises ~207 tools. `compact` (the image default) trims the
       # per-request schema payload from ~496 KB to ~290 KB. Set "full" if a
       # client-side feature needs the full nested schemas.
       REA_MCP_INPUT_SCHEMA_PROFILE: "compact"
@@ -62,7 +62,7 @@ mcp_servers:
 #      - /path/to/rea-agent-docker/targets:/targets:ro
 #      - -w
 #      - /work
-#      - rea-agent-ghidra:6.4.0-linux-amd64
+#      - rea-agent-ghidra:6.5.0-linux-amd64
 #      - rea
 #      - mcp
 #    timeout: 1800
@@ -101,6 +101,6 @@ mcp_servers:
 #   cp -r package/skills/reverse-engineer-anything "$skills_root/"
 #
 # Do NOT use `npx skills add morluto/rea --skill reverse-engineer-anything`: it
-# installs repository main, which is ahead of the release (skill v42 on main vs
-# v37 in a 6.4.0 image) and documents tools this server does not advertise.
+# installs repository main, which tracks unreleased work (it happens to be skill
+# v42 - the same as 6.5.0 - right now, but it is unversioned and drifts).
 # See docs/HERMES-MCP.md section 4 for the verification step.

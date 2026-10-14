@@ -49,8 +49,8 @@ for t in fixture-aarch64.elf:linux-aarch64 \
         >"$out" 2>"${out%.out}.err"
     rc=$?
     if grep -qi "unsupported ELF architecture" "$out"; then
-        # REA 6.4.0's artifact admission refuses some ELF machines; the tooling
-        # is fine, the release does not admit the target. Report, do not fail.
+        # REA's artifact admission refuses some ELF machines; the tooling is
+        # fine, the release does not admit the target. Report, do not fail.
         _skip "ghidra search $label" "REA $(rea --version 2>/dev/null) refuses this ELF architecture"
     elif [ $rc -ne 0 ]; then
         _bad "ghidra search $label" "exit=$rc (out: $out)"

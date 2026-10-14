@@ -1,7 +1,8 @@
 # Per-engine verification sweep (full harness, one run per engine image)
 #
 # Command: scripts/verify-all-engines.sh
-# Date:    2026-10-13T20:58:54Z
+# Date:    2026-10-14T21:26:22Z
+# REA:     6.5.0 (rea-agents npm release; skill v42, 207 MCP tools, 153 CLI commands)
 # Images:  rea-agent / -ghidra / -hopper / -ida, linux/amd64, built by scripts/build-all.sh
 # Result:  0 failures on all four (every skip is conditional and listed below)
 # NOTE: the `platform:` line in each run is redacted to 'Linux x86_64' - the
@@ -9,114 +10,84 @@
 # else in these summaries was altered.
 
 ===============================================================================
-engine: all        image: rea-agent:6.4.0-linux-amd64
+engine: all        image: ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64
 ===============================================================================
 rea-agent verification
-run:       20261013T202729Z
-date:      2026-10-13T20:39:11Z
-image:    rea-agent:6.4.0-linux-amd64
+run:       20261014T210000Z
+date:      2026-10-14T21:11:40Z
+image:     ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.21.0
-rea:       6.4.0
-passed:    96
+rea:       6.5.0
+passed:    107
 failed:    0
-skipped:   14
+skipped:   3
 
 skipped checks:
-  - ghidra search linux-riscv64
-  - ghidra search linux-powerpc
   - plist decode
-  - sqlite schema + row sample
-  - wasm artifact: imports/exports and WAT
-  - go-binary metadata probe
-  - pcap client inspection
-  - pcap capture: udp fields
-  - pcap summary
-  - sigrok decoder inventory
-  - vcd UART decode
-  - rea frida commands
   - ida doctor
   - jeb client
 
 ===============================================================================
-engine: ghidra        image: rea-agent-ghidra:6.4.0-linux-amd64
+engine: ghidra     image: ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64
 ===============================================================================
 rea-agent verification
-run:       20261013T203914Z
-date:      2026-10-13T20:50:24Z
-image:    rea-agent-ghidra:6.4.0-linux-amd64
+run:       20261014T211142Z
+date:      2026-10-14T21:23:13Z
+image:     ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.21.0
-rea:       6.4.0
-passed:    85
+rea:       6.5.0
+passed:    95
 failed:    0
-skipped:   18
+skipped:   8
 
 skipped checks:
   - hopper installation
   - doctor: hopper
-  - ghidra search linux-riscv64
-  - ghidra search linux-powerpc
   - hopper analysis
   - plist decode
-  - sqlite schema + row sample
-  - wasm artifact: imports/exports and WAT
-  - go-binary metadata probe
-  - pcap client inspection
-  - pcap capture: udp fields
-  - pcap summary
-  - sigrok decoder inventory
-  - vcd UART decode
-  - rea frida commands
   - ida doctor
   - IDADIR mount
   - jeb client
+  - hopper application-support dir
 
 ===============================================================================
-engine: hopper        image: rea-agent-hopper:6.4.0-linux-amd64
+engine: hopper     image: ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64
 ===============================================================================
 rea-agent verification
-run:       20261013T205026Z
-date:      2026-10-13T20:52:15Z
-image:    rea-agent-hopper:6.4.0-linux-amd64
+run:       20261014T212315Z
+date:      2026-10-14T21:24:54Z
+image:     ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.21.0
-rea:       6.4.0
-passed:    79
+rea:       6.5.0
+passed:    88
 failed:    0
-skipped:   16
+skipped:   7
 
 skipped checks:
   - ghidra installation
   - doctor: ghidra
   - ghidra analysis
   - plist decode
-  - sqlite schema + row sample
-  - wasm artifact: imports/exports and WAT
-  - go-binary metadata probe
-  - pcap client inspection
-  - pcap capture: udp fields
-  - pcap summary
-  - sigrok decoder inventory
-  - vcd UART decode
-  - rea frida commands
   - ida doctor
   - IDADIR mount
   - jeb client
 
 ===============================================================================
-engine: ida        image: rea-agent-ida:6.4.0-linux-amd64
+engine: ida        image: ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64
 ===============================================================================
 rea-agent verification
-run:       20261013T205217Z
-date:      2026-10-13T20:53:55Z
-image:    rea-agent-ida:6.4.0-linux-amd64
+run:       20261014T212456Z
+date:      2026-10-14T21:26:22Z
+image:     ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.21.0
-rea:       6.4.0
-passed:    72
+rea:       6.5.0
+passed:    80
 failed:    0
-skipped:   19
+skipped:   11
 
 skipped checks:
   - ghidra installation
@@ -126,16 +97,7 @@ skipped checks:
   - ghidra analysis
   - hopper analysis
   - plist decode
-  - sqlite schema + row sample
-  - wasm artifact: imports/exports and WAT
-  - go-binary metadata probe
-  - pcap client inspection
-  - pcap capture: udp fields
-  - pcap summary
-  - sigrok decoder inventory
-  - vcd UART decode
-  - rea frida commands
   - ida doctor
   - jeb client
+  - hopper application-support dir
   - mcp open_binary/analyze_function
-

@@ -71,7 +71,7 @@ Give it targets it can read: put samples in `./targets` (mounted read-only at
 
 ```bash
 # with the engine you built (REA_IMAGE/REA_ENGINE must match that image)
-REA_IMAGE=rea-agent-ghidra:6.4.0-linux-amd64 REA_ENGINE=ghidra \
+REA_IMAGE=rea-agent-ghidra:6.5.0-linux-amd64 REA_ENGINE=ghidra \
   docker compose -f docker-compose.yml -f compose.http.yml --profile ghidra up -d rea-mcp-http
 # or: make http-up ENGINE=ghidra
 
@@ -105,7 +105,7 @@ $ curl -sS -X POST http://127.0.0.1:8811/mcp \
     -d '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
 data: {"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true},
       "completions":{},"prompts":{"listChanged":true}},
-      "serverInfo":{"name":"rea","version":"6.4.0"},"instructions":"REA provides ..."}}
+      "serverInfo":{"name":"rea","version":"6.5.0"},"instructions":"REA provides ..."}}
 ```
 
 Notes for HTTP clients:
@@ -121,7 +121,7 @@ Notes for HTTP clients:
 
 ## 3. Tool catalog size
 
-REA advertises ~170 tools. Schemas dominate the payload:
+REA advertises ~207 tools. Schemas dominate the payload:
 
 | Profile   | Payload per request (measured upstream) | Notes |
 | --------- | --------------------------------------- | ----- |
@@ -181,11 +181,12 @@ For a given version this is byte-identical to the copy inside the image.
 npx skills add morluto/rea --skill reverse-engineer-anything   # NOT version-matched
 ```
 
-This takes the skill from repository `main`, which tracks unreleased work. At the
-time of writing (2026-10-14) `main` is skill v42 and describes 10 operations -
-Go, Rust, SQLite, WASM, packet and signal captures - that `rea-agents` 6.4.0
-does not advertise. It is the right choice only if you deliberately build from
-`main`.
+This takes the skill from repository `main`, which tracks unreleased work. That
+is why the version-matched routes above are the default. Note that as of REA
+6.5.0 (npm release, skill v42) `main` and the release currently agree — but this
+route is *unversioned*, so it starts to describe tools your server does not
+advertise the moment `main` moves ahead again. Use it only if you deliberately
+build from `main`.
 
 ### Verify the match
 
@@ -195,11 +196,11 @@ Ask the image which skill revision it expects, then compare your installed copy:
 # jq ships inside the image, so run it there - nothing is needed on the client:
 docker exec rea-agent-ghidra sh -c 'rea doctor --format json 2>/dev/null | tail -1 \
   | jq -r ".identity | \"cli \(.cli_package_version) | skill v\(.expected_skill_version) | tools \(.catalog.counts.mcp_tools)\""'
-# cli 6.4.0 | skill v37 | tools 170
+# cli 6.5.0 | skill v42 | tools 207
 
 grep -E '^  (version|tool_count):' "$skills_root/reverse-engineer-anything/SKILL.md"
-#   version: "37"
-#   tool_count: 170
+#   version: "42"
+#   tool_count: 207
 ```
 
 Both numbers must agree. `rea doctor` itself exits non-zero whenever it reports

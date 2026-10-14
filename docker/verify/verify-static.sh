@@ -3,9 +3,9 @@
 # pwntools, .NET via ilspycmd, Apple plists, EVM bytecode, artifact inspection
 # and JavaScript/Electron application graphs.
 #
-# check_rea is release-aware: command families the installed REA release does
-# not expose (they exist on repository main, e.g. sqlite/wasm/go in 6.4.0) are
-# SKIPPED rather than failed.
+# check_rea is release-aware: a command family the installed REA release does
+# not expose is SKIPPED rather than failed. 6.5.0 ships the sqlite/wasm/go
+# families, so those checks now run for real instead of skipping.
 set -uo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
@@ -89,8 +89,9 @@ if [ -d "$FIX/jsapp/src" ]; then
     check_rea "reference source import" import-reference-source "." -- "$FIX/jsapp/src" --json
 fi
 
-section "families not in this REA release (informational)"
-# These execute when the installed release exposes them, and SKIP otherwise.
+section "families added in REA 6.5.0"
+# These were `main`-only through 6.4.0. check_rea runs them when the installed
+# release exposes them and SKIPs otherwise, so this block is forward-compatible.
 if [ -s "$FIX/fixture.sqlite" ]; then
     check_rea "sqlite schema + row sample" inspect-sqlite-database "settings|license_requests" \
         -- "$FIX/fixture.sqlite" --table settings --row-limit 5 --json

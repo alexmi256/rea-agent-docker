@@ -138,9 +138,10 @@ fi
 : "${IDADIR:=/opt/ida}"
 
 # --- release-aware helpers ---------------------------------------------------
-# REA's catalog differs between the npm release and repository main (main is
-# ahead: sqlite/wasm/go/pcap/signal/frida families are not in 6.4.0). A family
-# the installed release does not expose is reported as SKIP, never FAIL, so the
+# The catalog is read from the *installed* release, never hardcoded: REA 6.5.0
+# ships the frida/sqlite/wasm/go/rust/pcap/signal families earlier releases left
+# on repository main, and a later release may add or drop more. A family the
+# installed release does not expose is reported as SKIP, never FAIL, so the
 # harness stays useful across REA upgrades.
 rea_commands() {
     if [ -z "${REA_COMMAND_LIST:-}" ]; then
@@ -155,7 +156,7 @@ check_rea() {
     local name="$1" cmd="$2" pattern="$3"; shift 3
     [ "${1:-}" = "--" ] && shift
     if ! rea_has_command "$cmd"; then
-        _skip "$name" "rea $cmd is not in REA $(rea --version 2>/dev/null) (present on main)"
+        _skip "$name" "rea $cmd is not in REA $(rea --version 2>/dev/null)"
         return 0
     fi
     check "$name" "$pattern" -- rea "$cmd" "$@"

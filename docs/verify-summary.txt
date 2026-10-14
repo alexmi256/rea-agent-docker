@@ -2,56 +2,44 @@
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 rea-agent verification
-run:       20261013T182120Z
-date:      2026-10-13T18:32:30Z
-image:     unknown
+run:       20261014T210000Z
+date:      2026-10-14T21:11:40Z
+image:     ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.21.0
-rea:       6.4.0
-passed:    88
+rea:       6.5.0
+passed:    107
 failed:    0
-skipped:   14
+skipped:   3
 
 skipped checks:
-  - ghidra search linux-riscv64
-  - ghidra search linux-powerpc
   - plist decode
-  - sqlite schema + row sample
-  - wasm artifact: imports/exports and WAT
-  - go-binary metadata probe
-  - pcap client inspection
-  - pcap capture: udp fields
-  - pcap summary
-  - sigrok decoder inventory
-  - vcd UART decode
-  - rea frida commands
   - ida doctor
   - jeb client
 
-Interpretation of the 14 skips (all conditional, none an image defect):
+Interpretation of the 3 skips (all conditional, none an image defect):
 
-  ghidra search linux-riscv64 / linux-powerpc
-      REA 6.4.0's artifact admission refuses those ELF e_machine values
-      ("unsupported ELF architecture"). Ghidra itself analysed x86-64, AArch64,
-      ARMv7, MIPS32 BE/LE and PE32+ in the same run.
   plist decode
       REA routes plists through its Apple-platform composite provider, which is
       unavailable for this input on Linux (capability_unavailable).
-  sqlite / wasm / go-binary / pcap x3 / sigrok x2 / frida
-      Command families that exist on REA's repository main but not in the 6.4.0
-      npm release. Their tooling (WABT, SQLite, tshark, sigrok-cli, frida) is
-      installed and checked directly, so a later REA_VERSION gains them.
   ida doctor / jeb client
       Bring-your-own commercial engines; skipped because no registration was
       configured for this run.
 
+On REA 6.4.0 the same harness reported 14 skips: the sqlite, wasm, go-binary,
+pcap x3, sigrok x2 and frida families were `main`-only and skipped as "not in
+REA <version>", and the RISC-V64/PowerPC ELF searches were refused by artifact
+admission. All of those now run for real on 6.5.0 and are listed as passes.
+
 Verified in this run: Ghidra analyze/function/decompile/instructions (x86-64),
-import+search across AArch64/ARMv7/MIPS32 BE+LE/PE32+, AArch64 and MIPS32
-decompilation, Hopper demo-mode analyze/decompile/search, ELF layout (pwntools),
-managed artifact + members + a real ilspycmd decompilation, EVM selectors,
-JS/Electron application graph + evidence->view round trip, historical source
-import, firmware regions + extraction, HAR + live mitmdump capture, Chrome CDP
-target/page/screenshot, Playwright launch->click->DOM, PTY process capture,
-adb/apktool/JADX, frida binding, MCP stdio handshake (170 tools) + engine-free
-tools/call + Ghidra open_binary/analyze_function/close_binary, and the
-Streamable HTTP bridge.
+import+search across AArch64/ARMv7/MIPS32 BE+LE/RISC-V64/PowerPC/PE32+, AArch64
+and MIPS32 decompilation, Hopper demo-mode analyze/decompile/search, ELF layout
+(pwntools), managed artifact + members + a real ilspycmd decompilation, EVM
+selectors, JS/Electron application graph + evidence->view round trip, historical
+source import, SQLite schema+rows and a WABT wasm inspection and a Go-metadata
+probe, firmware regions + extraction, HAR + live mitmdump capture, Chrome CDP
+target/page/screenshot, Playwright launch->click->DOM, tshark pcap fields/summary,
+sigrok decoder search + VCD UART decode, PTY process capture, adb/apktool/JADX,
+frida binding + frida device inventory, MCP stdio handshake (207 tools) +
+engine-free tools/call + Ghidra open_binary/analyze_function/close_binary, and
+the Streamable HTTP bridge.

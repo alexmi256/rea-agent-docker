@@ -78,7 +78,7 @@ Keep at least ~2× the largest target's expected working set free on the host;
 **`rea doctor --provider hopper --json` is unhealthy (`hopper-version`
 `config_drift`)**
 REA matches the Hopper *launcher's SHA-256* against the single Linux build it
-validated per package family. REA 6.4.0 pins Hopper 6.4.2 (demo), which is what
+validated per package family. REA 6.5.0 pins Hopper 6.4.2 (demo), which is what
 this image installs; a licensed or hand-built Hopper will report drift even
 though it may analyse fine. To check which build your REA expects:
 
@@ -174,13 +174,14 @@ The usual cause is `VAR: ${VAR:-}` in a compose `environment:` map (or an
 `env_file`, which only defines present variables) and never list them with an
 empty default. Comment a line out instead of blanking it.
 
-**Frida tools do not appear in the MCP catalog**
-REA 6.4.0 (the npm release) ships no frida tools — the family exists on
-repository `main` and will arrive in a later release. The image installs and
-verifies the frida binding (`getLocalDevice()` returns the local system), so a
-later `REA_VERSION` build arg picks it up with no other change. `rea --help`
-is the ground truth: if it lists no frida command, the release you installed
-has none.
+**Frida tools and the MCP catalog**
+REA 6.5.0 is the first release to expose the frida family (`list-frida-devices`,
+`list-frida-processes`, `instrument-with-frida`); through 6.4.0 it was on
+repository `main` only. The image has always installed and verified the frida
+**binding** (`getLocalDevice()` returns the local system), so the 6.5.0 build
+arg is all that was needed. `rea --help` is the ground truth: if it lists no
+frida command, the release you installed has none. Note that instrumentation
+executes foreign code and is destructive — it is not a read-only tool.
 
 **HTTP bridge unreachable**
 `REA_MCP_HTTP_BIND` defaults to `127.0.0.1` on the Docker host. Containerised
@@ -237,7 +238,7 @@ ownership once: `docker compose exec -u 0 rea-agent chown -R $(id -u):$(id -g) /
 **`docker compose pull` says denied / manifest unknown / not found**
 The GHCR packages are public, so `denied` usually means one of three things:
 you are pulling a name that does not exist yet (check
-`ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64` exactly — tags are
+`ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64` exactly — tags are
 per-image, there is no repo-wide `latest`), you are offline/behind a proxy that
 blocks `ghcr.io`, or a fork is asking for the upstream namespace. If *your own*
 pushed package is private, fix it once in the UI: package → **Settings → Change
@@ -254,7 +255,7 @@ scripts/image-name.sh ghidra          # or all | hopper | ida
 make sizes                            # what is actually present locally
 ```
 
-If you see a plain `rea-agent-ghidra:6.4.0-linux-amd64`, your `.env` is missing
+If you see a plain `rea-agent-ghidra:6.5.0-linux-amd64`, your `.env` is missing
 the GHCR values (copy them from `.env.example`).
 
 **A `--profile <engine> up -d` starts two containers**
