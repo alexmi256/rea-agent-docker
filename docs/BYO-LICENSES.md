@@ -44,7 +44,9 @@ filename from the installed REA package at build time rather than hardcoding
 it:
 
 ```bash
-grep -rohE 'Hopper-[0-9]+\.[0-9]+\.[0-9]+-Linux-demo\.deb' "$(npm root -g)/rea-agents/dist" | head -1
+# inside the image - this is the build's own step; a host shell has no REA:
+docker run --rm --entrypoint sh rea-agent-hopper:6.4.0-linux-amd64 -c \
+  'grep -rohE "Hopper-[0-9.]+-Linux-demo[.]deb" "$(npm root -g)/rea-agents/dist" | head -1'
 ```
 
 The launcher digest is printed by the build log
@@ -83,7 +85,9 @@ Two supported arrangements.
 
 Use the engine-less `rea-ida` service - it exists for exactly this, and its image
 carries no other engine to confuse the provider choice. (The `rea-agent` service
-works too, via the same overlay: `-f compose.ida.yml up -d rea-agent`.)
+works too, via the same overlay: `-f docker-compose.yml -f compose.ida.yml up -d
+rea-agent` - the base file has to be listed too, or compose only sees the
+overlay's service definitions.)
 
 ```bash
 # 1. point at an existing installation - do not bake IDA into a pushed image

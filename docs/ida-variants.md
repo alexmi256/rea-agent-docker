@@ -108,7 +108,7 @@ docker compose exec rea-ida rea doctor --provider ida --json
 activates or licenses anything - it only writes a registration file and reports
 what REA makes of it.
 
-## Two things that bite people
+## Three things that bite people
 
 1. **Give REA the original binary, not an `.idb`/`.i64`.** The attached and
    native profiles bind to IDA's *recorded input hash*, so REA must be handed the

@@ -1,8 +1,8 @@
 # Exposing rea-agent's MCP surface to Hermes (and other clients)
 
 REA serves **stdio only** (`rea mcp`, verified in the package: `scripts/rea.mjs`
-routes to `dist/mcp/main.js` for `mcp`/`--mcp` and there is no HTTP transport in
-the server). Two ways to consume it from a client that is not in the same
+routes `mcp`/`--mcp` to `dist/main.js` and there is no HTTP transport in the
+server). Two ways to consume it from a client that is not in the same
 container:
 
 | Path | How | When to use |
@@ -44,9 +44,12 @@ mcp_servers:
       enabled: false       # REA never asks the client to sample
 ```
 
-Then restart Hermes. Tools are exposed as `mcp_rea_<tool>`, e.g.
-`mcp_rea_open_binary`, `mcp_rea_analyze_function`, `mcp_rea_search_strings`,
-`mcp_rea_decompile_function`, `mcp_rea_close_binary`.
+Then restart Hermes (or reload MCP in the running session). Hermes registers
+MCP tools as `mcp__<server>__<tool>` — double underscore either side of the
+server name — so this server's tools appear as `mcp__rea__<tool>`, e.g.
+`mcp__rea__open_binary`, `mcp__rea__analyze_function`,
+`mcp__rea__search_strings`, `mcp__rea__procedure_pseudo_code`,
+`mcp__rea__close_binary`.
 
 Why this shape works:
 
@@ -139,12 +142,22 @@ the skill on the Hermes side instead:
 npx skills add morluto/rea --skill reverse-engineer-anything
 ```
 
-or copy it out of the image (npm's global root is `/usr/local/lib/node_modules`):
+or copy the image's own copy - the one pinned to the REA release in that image -
+out of the container (npm's global root is `/usr/local/lib/node_modules`, and the
+skill sits in the package's plain `skills/` directory):
 
 ```bash
-docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/.agents/skills/reverse-engineer-anything \
-  ~/.hermes/skills/
+# Hermes' skills root is $HERMES_HOME/skills when HERMES_HOME is set (it often
+# is for a containerised Hermes, e.g. /opt/data), otherwise ~/.hermes/skills.
+skills_root="${HERMES_HOME:-$HOME/.hermes}/skills"
+docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+  "$skills_root/"
 ```
+
+The two routes are not equivalent: `npx skills add` takes the skill from
+repository `main`, while this one matches the release inside the image (the
+in-image copy is the smaller, released revision; `main` may describe tools the
+installed server does not advertise).
 
 ## 5. Verifying the wiring
 
@@ -157,5 +170,5 @@ docker compose exec rea-ghidra /opt/rea/verify/verify-all.sh --only mcp
 printf '%s\n%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"x","version":"1"}}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-| docker exec -i rea-ghidra rea mcp | head -2
+| docker exec -i rea-agent-ghidra rea mcp | head -2   # container name, not the compose service
 ```

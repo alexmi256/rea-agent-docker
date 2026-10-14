@@ -1,8 +1,9 @@
 # Wiring rea-agent's MCP surface into Hermes Agent
 #
 # Add the block below to ~/.hermes/config.yaml and restart Hermes
-# (`hermes restart`, or exit and relaunch). Tools appear as mcp_rea_<tool>,
-# e.g. mcp_rea_open_binary, mcp_rea_analyze_function.
+# (`hermes restart`, or exit and relaunch). Hermes registers MCP tools as
+# mcp__<server>__<tool>, so this entry's tools appear as mcp__rea__<tool>,
+# e.g. mcp__rea__open_binary, mcp__rea__analyze_function.
 #
 # Prerequisite: the container is up. Pick the engine you built - the container
 # name is the only thing that changes between them (docs/IMAGES.md):
@@ -87,5 +88,6 @@ mcp_servers:
 #
 # or copy the workflow out of the container:
 #
-#   docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/.agents/skills/reverse-engineer-anything \
-#     ~/.hermes/skills/
+#   skills_root="${HERMES_HOME:-$HOME/.hermes}/skills"   # $HERMES_HOME/skills when set
+#   docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+#     "$skills_root/"

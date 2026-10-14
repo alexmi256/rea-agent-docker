@@ -58,8 +58,8 @@ Container Registry by CI on every push to `main`, and the packages are **public*
 
 ```bash
 # the compose defaults are already these names, so:
-docker compose pull                       # everything you have profiles for
-docker compose --profile ghidra up -d rea-ghidra
+docker compose pull                       # only the active profiles' services (here: rea-agent)
+docker compose --profile ghidra up -d rea-ghidra   # pulls that image on demand
 
 # or, explicitly per engine
 docker pull ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64
@@ -94,8 +94,10 @@ own account:
 
 1. Update the four `REA_*_IMAGE` names in `.env.example`, and the fallbacks in
    `docker-compose.yml` / `compose.http.yml`, to your own
-   `ghcr.io/<you>/...` names (the CI `validate` job fails if these, the resolver
-   output and the docs disagree — that check exists to catch exactly this).
+   `ghcr.io/<you>/...` names (the CI `validate` job fails when these disagree with
+   `scripts/image-name.sh`'s resolution and the `docker-compose.yml` defaults -
+   it only checks that the docs still *mention* `ghcr.io`, so renaming the docs
+   to match is on you).
 2. The `build` job declares `permissions: packages: write`, and that alone is
    enough even when the repository's default workflow permission is only *read* —
    verified on this repo, whose default is `read` and whose push succeeded,
@@ -155,8 +157,8 @@ against the same workspace, or two analyses will race over the same files.
 ### Talking to the container's MCP surface
 
 ```bash
-# stdio - what Hermes/Claude Code/Codex spawn
-docker exec -i rea-ghidra rea mcp
+# stdio - what Hermes/Claude Code/Codex spawn (container name, not service name)
+docker exec -i rea-agent-ghidra rea mcp
 
 # Streamable HTTP bridge on 127.0.0.1:8811
 REA_IMAGE=rea-agent-ghidra:6.4.0-linux-amd64 REA_ENGINE=ghidra \

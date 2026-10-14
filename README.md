@@ -58,8 +58,8 @@ just:
 ```bash
 git clone <this repo> rea-agent-docker && cd rea-agent-docker
 cp .env.example .env           # already points at ghcr.io; set REA_UID/REA_GID to your user
-docker compose pull            # or: make pull-all   — ~8 GB per image
-docker compose --profile ghidra up -d rea-ghidra
+docker compose pull            # active profiles only (here: rea-agent) — ~8 GB each
+docker compose --profile ghidra up -d rea-ghidra   # pulls that image on demand if skipped
 docker compose exec rea-ghidra rea doctor --json
 ```
 
@@ -247,7 +247,7 @@ Phases:
 | `static` | `inspect-binary-layout` (pwntools), `inspect-wasm-artifact` (WABT), `inspect-sqlite-database`, `inspect-managed-artifact`/`-members` (.NET), `inspect-plist`, `inspect-evm-interface`, `analyze-javascript-application`, `import-reference-source` |
 | `capture` | tshark pcap fields/summary, sigrok VCD decode, binwalk regions, unblob extraction, HAR + a **real mitmdump capture**, Chrome CDP target discovery/page/screenshot capture, Playwright scenario (launch+click+DOM), PTY process capture |
 | `clients` | Frida device inventory, adb client/devices, Apktool launcher, JADX engine JAR, IDA registration acceptance, JEB endpoint, Hopper state dir |
-| `mcp` | a real MCP client (`docker/verify/mcp-probe.mjs`): `initialize` → `tools/list` (~170 tools) → `tools/call inspect_sqlite_database` → where the image has an engine, `open_binary` + `analyze_function` + `close_binary` through it; then the Streamable HTTP bridge is started and initialised over HTTP |
+| `mcp` | a real MCP client (`docker/verify/mcp-probe.mjs`): `initialize` → `tools/list` (~170 tools) → `tools/call` on the first engine-free tool the *installed release* advertises (on 6.4.0 that is `inspect_binary_layout`; SQLite/WASM/Go are `main`-only) → where the image has an engine, `open_binary` + `analyze_function` + `close_binary` through it; then the Streamable HTTP bridge is started and initialised over HTTP |
 
 Reports land in `work/verify-reports/<timestamp>/` — `summary.txt` plus raw
 stdout/stderr per check in `logs/`, so a failure is always inspectable.
@@ -256,7 +256,7 @@ stdout/stderr per check in `logs/`, so a failure is always inspectable.
 
 See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) — the recorded per-engine
 sweep with the exact commands and pass/fail/skip tables, and
-[`docs/verify-engines.txt`](verify-engines.txt) for the raw per-engine summaries.
+[`docs/verify-engines.txt`](docs/verify-engines.txt) for the raw per-engine summaries.
 Final sweep (full harness, one run per image): `all` 96 passed / 0 failed / 14
 skipped, `ghidra` 85/0/18, `hopper` 79/0/16, `ida` 72/0/19 — every image
 exited 0, and every skip is conditional (engine absent from that image, release

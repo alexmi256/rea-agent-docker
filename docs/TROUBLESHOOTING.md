@@ -3,6 +3,9 @@
 Start here:
 
 ```bash
+# `rea-agent` is the all-engines service - substitute the service you actually
+# started (`rea-ghidra`, `rea-hopper`, `rea-ida`); compose exec takes services,
+# plain `docker exec` takes container names (`rea-agent-ghidra`, ...).
 docker compose exec rea-agent rea doctor --json            # everything REA can see
 docker compose exec rea-agent rea doctor --provider ghidra --json
 docker compose exec rea-agent rea doctor --provider hopper --json
@@ -80,7 +83,7 @@ this image installs; a licensed or hand-built Hopper will report drift even
 though it may analyse fine. To check which build your REA expects:
 
 ```bash
-docker run --rm rea-agent:latest bash -c \
+docker run --rm ghcr.io/alexmi256/rea-agent:latest bash -c \
   'grep -rhoE "Hopper-[0-9.]+-Linux-demo[.a-z]+" "$(npm root -g)/rea-agents/dist" | sort -u'
 ```
 

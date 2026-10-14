@@ -57,7 +57,8 @@ reported instead of silently producing wrong pseudocode.
 ```bash
 docker compose exec rea-agent bash
 $ qemu-mips-static -L /usr/mips-linux-gnu /targets/daemon &
-$ rea instrument-with-frida --host 127.0.0.1 ... # or capture-process / adb-style workflows
+$ rea capture-process ./scenario.json --json     # runtime evidence; frida instrumentation
+                                                # is on REA's main, not in the 6.4.0 release
 $ gdb-multiarch /targets/daemon -ex 'set sysroot /usr/mips-linux-gnu' ...
 ```
 

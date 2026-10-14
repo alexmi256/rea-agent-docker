@@ -3,7 +3,8 @@
 # rea-agent verification harness - run inside the container:
 #
 #   docker compose exec rea-agent /opt/rea/verify/verify-all.sh
-#   docker run --rm -v "$PWD/work:/work" rea-agent:latest /opt/rea/verify/verify-all.sh --quick
+#   docker run --rm -v "$PWD/work:/work" \
+#     ghcr.io/alexmi256/rea-agent-ghidra:6.4.0-linux-amd64 /opt/rea/verify/verify-all.sh --quick
 #
 # Phases (each writes raw stdout/stderr under <report>/logs):
 #   1 tools      tool presence + versions
