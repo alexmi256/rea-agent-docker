@@ -136,28 +136,78 @@ nested schemas. `REA_MCP_MAX_RESPONSE_BYTES` caps individual tool results.
 REA ships an agent workflow (`reverse-engineer-anything`) that teaches the
 investigation loop. This image does not run `rea setup --client hermes`, because
 that would have to write into Hermes' own config from inside a container. Load
-the skill on the Hermes side instead:
+the skill on the Hermes side instead.
 
-```bash
-npx skills add morluto/rea --skill reverse-engineer-anything
-```
+Install the revision that matches the release in your image. The skill is
+versioned with the package: `REA_VERSION` in `.env` selects `rea-agents@<version>`,
+which ships exactly one skill `metadata.version`/`tool_count`. A skill from a
+different revision describes tools the server does not advertise - in either
+direction - so match the release you built.
 
-or copy the image's own copy - the one pinned to the REA release in that image -
-out of the container (npm's global root is `/usr/local/lib/node_modules`, and the
-skill sits in the package's plain `skills/` directory):
+### Route 1 (default): copy the skill out of the image
+
+The package the image installed from already carries the matching copy (npm's
+global root is `/usr/local/lib/node_modules`, and the skill sits in the package's
+plain `skills/` directory), so this needs no network and cannot mismatch:
 
 ```bash
 # Hermes' skills root is $HERMES_HOME/skills when HERMES_HOME is set (it often
 # is for a containerised Hermes, e.g. /opt/data), otherwise ~/.hermes/skills.
+# The container name is the only thing that changes between engines.
 skills_root="${HERMES_HOME:-$HOME/.hermes}/skills"
-docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+docker cp rea-agent-ghidra:/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
   "$skills_root/"
 ```
 
-The two routes are not equivalent: `npx skills add` takes the skill from
-repository `main`, while this one matches the release inside the image (the
-in-image copy is the smaller, released revision; `main` may describe tools the
-installed server does not advertise).
+If another client of yours reads the `~/.agents/skills` convention, put the same
+copy there - or make one path point at the other - so the two cannot drift.
+
+### Route 2: extract it from the pinned npm tarball
+
+No container needed, and version-matched by construction:
+
+```bash
+REA_VERSION="$(grep -m1 '^REA_VERSION=' .env | cut -d= -f2)"   # keep in step with the image
+npm pack "rea-agents@${REA_VERSION}"
+tar -xzf "rea-agents-${REA_VERSION}.tgz" package/skills/reverse-engineer-anything
+cp -r package/skills/reverse-engineer-anything "$skills_root/"
+```
+
+For a given version this is byte-identical to the copy inside the image.
+
+### Do not install from repository main
+
+```bash
+npx skills add morluto/rea --skill reverse-engineer-anything   # NOT version-matched
+```
+
+This takes the skill from repository `main`, which tracks unreleased work. At the
+time of writing (2026-10-14) `main` is skill v42 and describes 10 operations -
+Go, Rust, SQLite, WASM, packet and signal captures - that `rea-agents` 6.4.0
+does not advertise. It is the right choice only if you deliberately build from
+`main`.
+
+### Verify the match
+
+Ask the image which skill revision it expects, then compare your installed copy:
+
+```bash
+# jq ships inside the image, so run it there - nothing is needed on the client:
+docker exec rea-agent-ghidra sh -c 'rea doctor --format json 2>/dev/null | tail -1 \
+  | jq -r ".identity | \"cli \(.cli_package_version) | skill v\(.expected_skill_version) | tools \(.catalog.counts.mcp_tools)\""'
+# cli 6.4.0 | skill v37 | tools 170
+
+grep -E '^  (version|tool_count):' "$skills_root/reverse-engineer-anything/SKILL.md"
+#   version: "37"
+#   tool_count: 170
+```
+
+Both numbers must agree. `rea doctor` itself exits non-zero whenever it reports
+any unrelated finding (a single-engine image has no Hopper or IDA), so read the
+values rather than the exit code. `rea doctor --skill` is not a substitute: it
+inspects the skill directories *inside the container*, which cannot see a skill
+installed on the client side, and reports `skill: identity is missing` when run
+that way.
 
 ## 5. Verifying the wiring
 

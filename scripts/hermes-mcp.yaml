@@ -79,15 +79,28 @@ mcp_servers:
 #    timeout: 1800
 #    connect_timeout: 120
 
-# --- optional: skip REA's bundled skill prompt shim --------------------------
+# --- install REA's bundled workflow skill (version-matched) ------------------
 # REA also ships agent instructions (`npx rea-agents setup --client hermes`).
 # This image does not run setup for you: it would write into Hermes' own config
-# inside a different container. Install the skill from the Hermes side instead:
+# inside a different container. Install the skill from the client side instead,
+# and use the copy that matches the release in this image - the skill is
+# versioned with the package, so a different revision describes tools your
+# server does not advertise.
 #
-#   npx skills add morluto/rea --skill reverse-engineer-anything
-#
-# or copy the workflow out of the container:
+# 1) copy it out of the container (default; no network, cannot mismatch):
 #
 #   skills_root="${HERMES_HOME:-$HOME/.hermes}/skills"   # $HERMES_HOME/skills when set
-#   docker cp rea-agent:/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+#   docker cp rea-agent-ghidra:/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
 #     "$skills_root/"
+#
+# 2) or extract the pinned npm tarball, same version as REA_VERSION in .env:
+#
+#   REA_VERSION="$(grep -m1 '^REA_VERSION=' .env | cut -d= -f2)"
+#   npm pack "rea-agents@${REA_VERSION}"
+#   tar -xzf "rea-agents-${REA_VERSION}.tgz" package/skills/reverse-engineer-anything
+#   cp -r package/skills/reverse-engineer-anything "$skills_root/"
+#
+# Do NOT use `npx skills add morluto/rea --skill reverse-engineer-anything`: it
+# installs repository main, which is ahead of the release (skill v42 on main vs
+# v37 in a 6.4.0 image) and documents tools this server does not advertise.
+# See docs/HERMES-MCP.md section 4 for the verification step.

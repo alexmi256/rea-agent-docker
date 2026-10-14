@@ -91,7 +91,20 @@ mcp_servers:
     connect_timeout: 120
 ```
 
-Ask it something with a real target:
+Install REA's workflow skill into your client — use the copy bundled in the
+image, which is the revision matching the `rea-agents` version you built
+(`npx skills add morluto/rea` installs repository `main` and will not match):
+
+```bash
+skills_root="${HERMES_HOME:-$HOME/.hermes}/skills"
+docker cp rea-agent-ghidra:/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything \
+  "$skills_root/"
+```
+
+Pinned alternative and the verification step:
+[docs/HERMES-MCP.md](docs/HERMES-MCP.md) (section 4).
+
+Then ask it something with a real target:
 
 ```bash
 cp suspicious.elf targets/
