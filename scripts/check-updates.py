@@ -136,18 +136,25 @@ class Fetcher:
         return result
 
     def _json_uncached(self, url: str) -> object:
+        errors: list[str] = []
         if self._use_gh and "api.github.com/repos/" in url:
             path = url.split("api.github.com/", 1)[1]
-            proc = subprocess.run(
-                ["gh", "api", path],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout + 10,
-                check=False,
-            )
-            if proc.returncode == 0 and proc.stdout.strip():
-                return json.loads(proc.stdout)
-            raise RuntimeError(f"gh api {path}: {proc.stderr.strip()[:120] or 'no output'}")
+            try:
+                proc = subprocess.run(
+                    ["gh", "api", path],
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout + 10,
+                    check=False,
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    return json.loads(proc.stdout)
+                errors.append(f"gh api {path}: {proc.stderr.strip()[:100] or 'no output'}")
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"gh api {path}: {exc}")
+            # Fall through: an unauthenticated `gh` (the normal state on a GitHub
+            # runner without GH_TOKEN) must not turn every GitHub-sourced row into
+            # "unknown" when plain HTTPS would have answered.
         request = urllib.request.Request(
             url,
             headers={
@@ -155,8 +162,13 @@ class Fetcher:
                 "Accept": "application/vnd.github+json, application/json",
             },
         )
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            return json.loads(response.read().decode("utf-8", "replace"))
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return json.loads(response.read().decode("utf-8", "replace"))
+        except Exception as exc:  # noqa: BLE001
+            if errors:
+                raise RuntimeError("; ".join([*errors, f"https: {exc}"])) from exc
+            raise
 
     def text(self, url: str) -> str:
         if url in self._cache:

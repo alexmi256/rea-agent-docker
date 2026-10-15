@@ -32,6 +32,11 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Check pins against upstream and against what REA admits
+        env:
+          # Authenticated `gh` (higher rate limit). The script falls back to plain
+          # HTTPS when this is absent, so the job still works without it - it just
+          # risks the anonymous 60-requests/hour limit.
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # Two passes over the same data: one for the machine, one for the
@@ -39,7 +44,20 @@ jobs:
           scripts/check-updates.py --json --no-fail > "$RUNNER_TEMP/updates.json"
           scripts/check-updates.py --markdown --no-fail > "$RUNNER_TEMP/updates.md"
           cat "$RUNNER_TEMP/updates.md" >> "$GITHUB_STEP_SUMMARY"
+          python3 - "$RUNNER_TEMP/updates.json" <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          s = d["summary"]
+          print()
+          print(f"_{s['rows']} rows checked, {s['unknown']} unverifiable, "
+                f"{s['actionable']} actionable._")
+          PY
           actionable="$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/updates.json'))['summary']['actionable'])")"
+          unknown="$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/updates.json'))['summary']['unknown'])")"
+          echo "actionable=$actionable unknown=$unknown"
+          if [ "$unknown" != "0" ]; then
+            echo "::warning::$unknown row(s) could not be checked - a lookup failed, so this run does not prove they are current"
+          fi
           if [ "$actionable" != "0" ]; then
             echo "::warning::$actionable pinned version(s) are behind - see docs/UPDATES.md for the procedure"
             exit 1

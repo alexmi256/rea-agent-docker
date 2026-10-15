@@ -308,7 +308,12 @@ and it is separate from the image build on purpose: a red `updates` run means
   (Actions → *updates* → the run → **Summary**);
 * the JSON report is uploaded as the `update-check` artifact;
 * the job **fails when anything is actionable** — the failure is the reminder,
-  and it names the component plus both candidates.
+  and it names the component plus both candidates;
+* it warns when a row could **not be checked** (`unknown`). An unverifiable row
+  is not a pass: it means a lookup failed, so that run proved nothing about the
+  component. The job sets `GH_TOKEN` so GitHub-sourced rows use the
+  authenticated rate limit, and the fetcher falls back to plain HTTPS when `gh`
+  is missing or unauthenticated.
 
 Locally the same check is `make check-updates` (or `make check-updates-json`).
 CI's `validate` job additionally syntax-checks the script and proves it starts
