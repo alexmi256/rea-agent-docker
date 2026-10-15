@@ -13,6 +13,7 @@ vendor/hopper-state/*
 !vendor/.gitkeep
 work/
 targets/
+ctf/
 config/ida/*.hexlic
 config/ida-mcp.json
 config/rea.env
