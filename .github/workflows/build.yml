@@ -128,6 +128,15 @@ jobs:
           done
           echo "shell scripts parse"
 
+      - name: Python syntax (the update checker)
+        run: |
+          set -e
+          # No network here: --help must work offline, and the module must
+          # import cleanly, or the weekly `updates` workflow fails at 6am.
+          python3 -m py_compile scripts/check-updates.py
+          scripts/check-updates.py --help > /dev/null
+          echo "check-updates.py imports and starts"
+
       - name: YAML syntax
         run: |
           python3 -c "import yaml" 2>/dev/null || sudo apt-get install -y -qq python3-yaml
@@ -164,7 +173,7 @@ jobs:
           set -e
           # Entry points are invoked by path (Makefile, docs, each other), so
           # they must be executable in git - not just readable by `bash <path>`.
-          for f in scripts/*.sh docker/*.sh docker/verify/*.sh; do
+          for f in scripts/*.sh scripts/*.py docker/*.sh docker/verify/*.sh; do
             [ -x "$f" ] || { echo "not executable in git: $f"; exit 1; }
           done
           echo "every script is executable"

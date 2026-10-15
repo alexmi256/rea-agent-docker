@@ -130,6 +130,14 @@ test-host: ## run the harness in a throwaway container against ./work
 	  -v $(PWD)/work:/work -v $(PWD)/config:/etc/rea:ro $(IMAGE) \
 	  /opt/rea/verify/verify-all.sh
 
+.PHONY: check-updates
+check-updates: ## are the pins still current? (upstream + what REA admits)
+	scripts/check-updates.py $(ARGS)
+
+.PHONY: check-updates-json
+check-updates-json: ## the same check as JSON (for scripts)
+	scripts/check-updates.py --json --no-fail
+
 .PHONY: sizes
 sizes: ## report the size of every engine image
 	@for e in all ghidra hopper ida; do \

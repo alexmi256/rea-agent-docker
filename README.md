@@ -221,12 +221,34 @@ docker/verify/             the in-image, engine-aware verification harness
 scripts/build.sh           build one engine image (path-mapped for DooD)
 scripts/build-all.sh       build all four, then report sizes
 scripts/verify.sh          run the harness in a throwaway container
+scripts/check-updates.py   are the pins still current? (upstream vs what REA admits)
+scripts/image-name.sh      resolve an engine to its image (one source of truth)
 scripts/setup-ida-mcp.sh   wire IDA into REA (6 modes)
 scripts/hermes-mcp.yaml    paste-ready Hermes MCP block
 docs/                      images, architecture, BYO licences, IDA editions,
-                           multi-arch, MCP, troubleshooting, verification
-.github/workflows/         CI: build + verify per engine, full on demand
+                           multi-arch, MCP, troubleshooting, updates, verification
+.github/workflows/         CI: validate + publish per engine; weekly pin check
 ```
+
+---
+
+## Keeping up to date
+
+```bash
+make check-updates      # ~5 s: every pin, what upstream ships, what REA admits
+```
+
+One row per component, exit code 1 when something needs action. The distinction
+it encodes is the whole game: **REA validates engines and helper tools by digest
+or version banner, so upstream "latest" is frequently the wrong target** — it
+refuses a Hopper build whose launcher digest it has not verified and a Ghidra
+release it was not built against. The checker reads REA's admitted versions live
+from the pinned release, so bumping REA re-derives them.
+
+A weekly CI job runs the same check and fails when something moves; the report
+lands in the run summary. Per-component procedures, the release-string files that
+must agree, the Wakaru gap, and the traps worth remembering are in
+**[docs/UPDATES.md](docs/UPDATES.md)**.
 
 ---
 
