@@ -120,17 +120,18 @@ Full walkthrough: [docs/HERMES-MCP.md](docs/HERMES-MCP.md).
 
 | Family | Tools | Pinned |
 | ------ | ----- | ------ |
-| REA | `rea-agents` CLI + MCP server | 6.5.0 (Node 24.21.0) |
+| REA | `rea-agents` CLI + MCP server | 6.5.0 (Node 24.22.0) |
 | Native engines | Ghidra + JDK 21, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.1.4, Hopper 6.4.2 |
-| ELF/core analysis | pwntools + pyelftools + Unicorn in a venv, `gdb` + `gdb-multiarch`, pwndbg | pwntools 4.15.0, pyelftools 0.33, Unicorn 2.1.2, pwndbg 2026.09.15 |
+| ELF/core analysis | pwntools + pyelftools + Unicorn in a venv, `gdb` + `gdb-multiarch`, pwndbg | pwntools 4.15.0, pyelftools 0.33, Unicorn 2.1.2 (held: pwntools excludes 2.1.3/2.1.4), pwndbg 2026.09.15 |
 | Firmware | binwalk (built from source), unblob + extractors (`debugfs`, 7z, squashfs, cpio, dtc, lz4/lzop/lzip, cabextract, ...) | binwalk 3.1.0, unblob 26.6.4 |
 | Packets / signals | tshark + capinfos, tcpdump, sigrok-cli + libsigrokdecode | TShark 4.2.2, sigrok-cli 0.7.2 |
 | Web / HTTP | mitmdump, HAR + SAZ readers, Google Chrome, Playwright Chromium | mitmproxy 12.2.3, playwright-core 1.58.2 |
 | Android | jadx-headless-mcp JAR, Apktool, adb | jadx-headless-mcp 0.7.1, Apktool 2.12.1 |
 | Managed code | .NET SDK 8 + ilspycmd | ilspycmd 8.2.0.7535 |
 | WASM / EVM | WABT, bundled EVMole (npm) | WABT 1.0.42 |
-| Dynamic / cross-arch | Frida (npm binding installed and loadable), qemu-user-static (all targets), wine, cross toolchains (aarch64, arm, mips, mipsel, riscv64, powerpc, mingw-w64) | Frida 17.23.2 binding |
-| MCP plumbing | uv (for PyPI MCP servers), supergateway (stdio ↔ Streamable HTTP) | uv 0.13.0, supergateway 4.1.0 |
+| JavaScript recovery | Wakaru — unpack bundles and recover readable modules (`recover_javascript_sources`) | Wakaru 1.14.0 (the build REA audited) |
+| Dynamic / cross-arch | Frida (npm binding installed and loadable), qemu-user-static (all targets), wine, cross toolchains (aarch64, arm, mips, mipsel, riscv64, powerpc, mingw-w64) | Frida 17.23.3 binding |
+| MCP plumbing | uv (for PyPI MCP servers), supergateway (stdio ↔ Streamable HTTP) | uv 0.13.1, supergateway 4.2.0 |
 
 Layer-by-layer detail, and what is deliberately **not** included:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -238,12 +239,15 @@ docs/                      images, architecture, BYO licences, IDA editions,
 make check-updates      # ~5 s: every pin, what upstream ships, what REA admits
 ```
 
-One row per component, exit code 1 when something needs action. The distinction
-it encodes is the whole game: **REA validates engines and helper tools by digest
-or version banner, so upstream "latest" is frequently the wrong target** — it
-refuses a Hopper build whose launcher digest it has not verified and a Ghidra
-release it was not built against. The checker reads REA's admitted versions live
-from the pinned release, so bumping REA re-derives them.
+One row per component. It exits non-zero only when the image is **wrong now**
+(a pin behind what REA admits, a capability REA advertises with no tool
+installed, or a new REA release — the trigger to move the pins). A merely-newer
+upstream release is listed but waits: the rule here is that pins follow
+`rea-agents`, and REA validates engines by digest and helper tools by version
+banner, so upstream "latest" is frequently the wrong target — it refuses a
+Hopper build whose launcher digest it has not verified and a Ghidra release it
+was not built against. The checker reads REA's admitted versions live from the
+pinned release, so bumping REA re-derives them.
 
 A weekly CI job runs the same check and fails when something moves; the report
 lands in the run summary. Per-component procedures, the release-string files that
@@ -277,9 +281,9 @@ Phases:
 
 | Phase | What it proves |
 | ----- | -------------- |
-| `tools` | the image's declared engine profile, the engine paths it advertises, and each helper reporting a version REA admits (e.g. WABT must say 1.0.42, sigrok-cli 0.7.2, mitmdump 12.2.3) |
+| `tools` | the image's declared engine profile, the engine paths it advertises, and each helper reporting a version REA admits, plus Wakaru's absolute path / executable state / banner / audited digest (e.g. WABT must say 1.0.42, sigrok-cli 0.7.2, mitmdump 12.2.3, wakaru 1.14.0) |
 | `analysis` | for the images that have them: `rea doctor --provider ghidra/hopper` healthy; Ghidra analyses **x86-64, aarch64, armv7, MIPS32 BE, MIPS32 LE, RISC-V64, PowerPC, Windows PE32+**; decompiles; string search; Hopper demo-mode analysis of the x86-64 fixture |
-| `static` | `inspect-binary-layout` (pwntools), `inspect-wasm-artifact` (WABT), `inspect-sqlite-database`, `inspect-managed-artifact`/`-members` (.NET), `inspect-plist`, `inspect-evm-interface`, `analyze-javascript-application`, `import-reference-source` |
+| `static` | `inspect-binary-layout` (pwntools), `inspect-wasm-artifact` (WABT), `recover-javascript-sources` (**Wakaru**, on a bundle fixture), `inspect-sqlite-database`, `inspect-managed-artifact`/`-members` (.NET), `inspect-plist`, `inspect-evm-interface`, `analyze-javascript-application`, `import-reference-source` |
 | `capture` | tshark pcap fields/summary, sigrok VCD decode, binwalk regions, unblob extraction, HAR + a **real mitmdump capture**, Chrome CDP target discovery/page/screenshot capture, Playwright scenario (launch+click+DOM), PTY process capture |
 | `clients` | Frida device inventory, adb client/devices, Apktool launcher, JADX engine JAR, IDA registration acceptance, JEB endpoint, Hopper state dir |
 | `mcp` | a real MCP client (`docker/verify/mcp-probe.mjs`): `initialize` → `tools/list` (~207 tools) → `tools/call` on the first engine-free tool the *installed release* advertises (currently `inspect_binary_layout`) → where the image has an engine, `open_binary` + `analyze_function` + `close_binary` through it; then the Streamable HTTP bridge is started and initialised over HTTP |

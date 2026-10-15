@@ -1,25 +1,274 @@
 # Per-engine verification sweep (full harness, one run per engine image)
 #
 # Command: scripts/verify-all-engines.sh
-# Date:    2026-10-14T21:26:22Z
-# REA:     6.5.0 (rea-agents npm release; skill v42, 207 MCP tools, 153 CLI commands)
+# Date:    2026-10-15T21:50:44Z
+# REA:     6.5.0 (rea-agents npm release; 207 MCP tools, matching the bundled skill)
 # Images:  rea-agent / -ghidra / -hopper / -ida, linux/amd64, built by scripts/build-all.sh
 # Result:  0 failures on all four (every skip is conditional and listed below)
+#
+# This run covers the 2026-10-15 dependency round: Node 24.21.0 -> 24.22.0,
+# frida 17.23.2 -> 17.23.3, uv 0.13.0 -> 0.13.1, supergateway 4.1.0 -> 4.2.0, and
+# the addition of Wakaru 1.14.0 (REA's JavaScript source recovery engine, with 13
+# new checks: 5 for REA's admission rules on the binary, 8 for the recovery
+# operation itself and the analysis of what it recovers). Unicorn stays at 2.1.2
+# because pwntools 4.15.0 declares `unicorn !=2.1.3,!=2.1.4`.
+#
 # NOTE: the `platform:` line in each run is redacted to 'Linux x86_64' - the
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 
-===============================================================================
-engine: all        image: ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64
-===============================================================================
+
+==============================================================
+=== verifying engine: all  (ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64)
+==============================================================
+running harness in ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64 as 10000:10000
+[rea-agent] loaded overrides from /etc/rea/rea.env
+[rea-agent] engine profile: all
+[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261015T212528Z  out=/work/verify-reports/20261015T212528Z
+
+== fixtures ==
+building C fixtures in /tmp/rea-verify/fixtures
+  + fixture-x86_64.elf
+  + fixture-aarch64.elf (aarch64)
+  + fixture-armv7.elf (arm)
+  + fixture-mips.elf (big-endian MIPS32)
+  + fixture-mipsel.elf (little-endian MIPS32)
+  + fixture-riscv64.elf (riscv64)
+  + fixture-ppc.elf (PowerPC)
+  + fixture-win64.exe (PE32+)
+  + module.wasm
+  + fixture.sqlite
+  + session.har
+  + Info.plist
+  + jsapp/
+  + jsbundle/bundle.min.js
+  + www/index.html
+  + fixture.pcap
+  + uart.vcd
+  + firmware.bin
+  + runtime.hex
+  + process-scenario.json, browser-scenario.json
+  + bundle.zip
+  dotnet: Restore succeeded.
+  dotnet: 
+  dotnet: 
+  dotnet: Build succeeded.
+  dotnet:     0 Warning(s)
+  dotnet:     0 Error(s)
+  dotnet: 
+  dotnet: Time Elapsed 00:00:02.09
+  + dotnet-app/bin/Release/net8.0/VerifyLib.dll
+fixtures ready in /tmp/rea-verify/fixtures
+
+== runtime ==
+  PASS node version
+  PASS npm present
+  PASS rea version
+  PASS rea providers (no bundled engine)
+
+== engine profile ==
+  PASS declared engine
+  PASS engine env file
+  PASS rea wrapper injects engine env
+  PASS rea wrapper is the engine-injecting shell script
+
+== container healthcheck ==
+  PASS healthcheck reports healthy
+  PASS healthcheck (deep) reports healthy
+
+== analysis engines ==
+  PASS java runtime
+  PASS javac present
+  PASS ghidra analyzeHeadless executable
+  PASS ghidra native decompiler (linux_x86_64)
+  PASS hopper launcher executable
+  PASS hopper shared libraries resolve (0 = none missing)
+  PASS hopper launcher digest is one REA accepts
+  PASS xvfb present
+  PASS IDA mount point
+  PASS IDA licence placement helpers
+
+== static analysis helpers ==
+  PASS pwntools venv python
+  PASS wabt 1.0.42
+  PASS jadx headless MCP jar
+  PASS jadx jar is a runnable archive
+  PASS apktool launcher
+  PASS dotnet sdk
+  PASS ilspycmd
+
+== javascript source recovery (Wakaru) ==
+  PASS REA_WAKARU_COMMAND is absolute
+  PASS wakaru binary is a real file, readable and executable
+  PASS wakaru banner in the form REA parses
+  PASS wakaru digest is REA's audited build
+  PASS util-linux prlimit (REA's resource limiter)
+
+== firmware / packet / signal ==
+  PASS binwalk
+  PASS unblob
+  PASS tshark
+  PASS capinfos
+  PASS sigrok-cli
+  PASS sigrok backend loads libsigrokdecode
+
+== capture / devices ==
+  PASS mitmdump
+  PASS adb
+  PASS frida binding loads and sees the local device
+
+== debuggers and arch emulation ==
+  PASS gdb
+  PASS gdb-multiarch
+  PASS gdb sources pwndbg
+  PASS qemu-user-static
+  PASS wine
+
+== browsers ==
+  PASS google-chrome
+  PASS playwright chromium
+
+== provider readiness ==
+  PASS doctor: ghidra
+  PASS doctor: hopper
+
+== ghidra: architecture coverage (multi-arch is the point) ==
+  PASS ghidra analyze linux-x86_64
+  PASS ghidra search linux-aarch64 finds fixture string
+  PASS ghidra search linux-armv7 finds fixture string
+  PASS ghidra search linux-mips32-be finds fixture string
+  PASS ghidra search linux-mips32-le finds fixture string
+  PASS ghidra search linux-riscv64 finds fixture string
+  PASS ghidra search linux-powerpc finds fixture string
+  PASS ghidra search windows-pe-x64 finds fixture string
+
+== ghidra: function and decompiler output ==
+  PASS ghidra function main (x86_64)
+  PASS ghidra decompile main mentions the fixture strings
+  PASS ghidra decompile aarch64 main
+  PASS ghidra decompile mips32 main
+  PASS ghidra instructions of main
+
+== hopper: headless demo analysis ==
+  PASS hopper analyze x86_64
+  PASS hopper decompile main
+  PASS hopper string search
+
+== provider capabilities ==
+  PASS providers listing
+  PASS capabilities listing
+
+== ELF layout (pwntools 4.15.0) ==
+  PASS binary layout: sections and main symbol
+
+== artifact inspection ==
+  PASS rea analyze on an application directory
+  PASS inspect-artifact on a zip bundle
+  PASS extract-artifact on a zip bundle
+
+== Apple static formats (platform-scoped in REA) ==
+  SKIP plist decode - REA routes plists through the Apple composite provider (unavailable on Linux for this input)
+
+== managed code (.NET / ilspycmd) ==
+  PASS managed artifact identity
+  PASS managed members include License.Describe
+  PASS ilspycmd decompiles the fixture assembly
+
+== EVM bytecode ==
+  PASS evm interface selectors
+
+== JavaScript / Electron application graph ==
+  PASS js application graph
+  PASS analysis view projection of saved evidence
+
+== JavaScript source recovery (Wakaru) ==
+  PASS js recovery: provider is Wakaru
+  PASS js recovery: reported version
+  PASS js recovery: completed with no failures
+  PASS js recovery: bundle decompiled into a module
+  PASS js recovery: REA fingerprinted the audited Wakaru build
+  PASS js recovery: published module file is non-empty
+  PASS js recovery: evidence keeps its limitations
+  PASS analysis of the recovered module tree
+
+== historical source import ==
+  PASS reference source import
+
+== families added in REA 6.5.0 ==
+  PASS sqlite schema + row sample
+  PASS wasm artifact: imports/exports and WAT
+  PASS go-binary metadata probe
+
+== firmware (binwalk 3.1.x + unblob 26.6.x) ==
+  PASS firmware regions (binwalk)
+  PASS firmware extraction (unblob)
+
+== HTTP captures ==
+  PASS HAR 1.2 capture
+  PASS native mitmproxy capture decode
+
+== browser: CDP observation ==
+  PASS browser target discovery (CDP)
+  PASS browser page capture (DOM/scripts)
+  PASS browser screenshot capture
+
+== browser: Playwright scenario ==
+  PASS playwright launch + click + DOM capture
+
+== process behaviour capture (native PTY) ==
+  PASS pty process capture
+
+== packet captures (tshark 4.x) ==
+  PASS pcap client inspection
+  PASS pcap capture: udp fields
+  PASS pcap summary
+
+== recorded signals (sigrok-cli 0.7.2 + libsigrokdecode) ==
+  PASS sigrok decoder inventory
+  PASS vcd UART decode
+
+== Frida (JS instrumentation) ==
+  PASS frida binding resolves from REA
+  PASS rea frida device inventory
+
+== Android: adb + Apktool + JADX engine ==
+  PASS adb client inspection
+  PASS adb device listing (no device attached is a valid answer)
+  PASS apktool client inspection
+  PASS apktool runs as a launcher
+  PASS jadx engine jar loads under java 21
+
+== IDA provider (bring your own install + licence) ==
+  SKIP ida doctor - REA_IDA_MCP_CONFIG not set (see docs/BYO-LICENSES.md)
+  PASS ida registration templates present
+  PASS IDADIR mount
+
+== JEB provider (bring your own licence) ==
+  SKIP jeb client - REA_JEB_MCP_URL not set (bring your own JEB)
+
+== Hopper licence/state layout ==
+  PASS hopper application-support dir
+
+== import-export / comparison surface ==
+  PASS compare command rejects identical artefacts cleanly
+
+== MCP over stdio (docker exec / subprocess) ==
+  PASS mcp initialize + tools/list (207 tools)
+  PASS mcp tools/call: engine-free tool returned data
+  PASS mcp open_binary via ghidra
+  PASS mcp analyze_function via ghidra
+
+== MCP over Streamable HTTP (supergateway bridge) ==
+  PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261014T210000Z
-date:      2026-10-14T21:11:40Z
+run:       20261015T212528Z
+date:      2026-10-15T21:37:16Z
 image:     ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
-node:      v24.21.0
+node:      v24.22.0
 rea:       6.5.0
-passed:    107
+passed:    120
 failed:    0
 skipped:   3
 
@@ -28,17 +277,253 @@ skipped checks:
   - ida doctor
   - jeb client
 
-===============================================================================
-engine: ghidra     image: ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64
-===============================================================================
+report: /work/verify-reports/20261015T212528Z
+passed=120 failed=0 skipped=3
+
+==============================================================
+=== verifying engine: ghidra  (ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64)
+==============================================================
+running harness in ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64 as 10000:10000
+[rea-agent] loaded overrides from /etc/rea/rea.env
+[rea-agent] engine profile: ghidra
+[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261015T213718Z  out=/work/verify-reports/20261015T213718Z
+
+== fixtures ==
+building C fixtures in /tmp/rea-verify/fixtures
+  + fixture-x86_64.elf
+  + fixture-aarch64.elf (aarch64)
+  + fixture-armv7.elf (arm)
+  + fixture-mips.elf (big-endian MIPS32)
+  + fixture-mipsel.elf (little-endian MIPS32)
+  + fixture-riscv64.elf (riscv64)
+  + fixture-ppc.elf (PowerPC)
+  + fixture-win64.exe (PE32+)
+  + module.wasm
+  + fixture.sqlite
+  + session.har
+  + Info.plist
+  + jsapp/
+  + jsbundle/bundle.min.js
+  + www/index.html
+  + fixture.pcap
+  + uart.vcd
+  + firmware.bin
+  + runtime.hex
+  + process-scenario.json, browser-scenario.json
+  + bundle.zip
+  dotnet: Restore succeeded.
+  dotnet: 
+  dotnet: 
+  dotnet: Build succeeded.
+  dotnet:     0 Warning(s)
+  dotnet:     0 Error(s)
+  dotnet: 
+  dotnet: Time Elapsed 00:00:02.11
+  + dotnet-app/bin/Release/net8.0/VerifyLib.dll
+fixtures ready in /tmp/rea-verify/fixtures
+
+== runtime ==
+  PASS node version
+  PASS npm present
+  PASS rea version
+  PASS rea providers
+
+== engine profile ==
+  PASS declared engine
+  PASS engine env file
+  PASS rea wrapper injects engine env
+  PASS rea wrapper is the engine-injecting shell script
+
+== container healthcheck ==
+  PASS healthcheck reports healthy
+  PASS healthcheck (deep) reports healthy
+
+== analysis engines ==
+  PASS java runtime
+  PASS javac present
+  PASS ghidra analyzeHeadless executable
+  PASS ghidra native decompiler (linux_x86_64)
+  SKIP hopper installation - not in this image (engine: ghidra)
+
+== static analysis helpers ==
+  PASS pwntools venv python
+  PASS wabt 1.0.42
+  PASS jadx headless MCP jar
+  PASS jadx jar is a runnable archive
+  PASS apktool launcher
+  PASS dotnet sdk
+  PASS ilspycmd
+
+== javascript source recovery (Wakaru) ==
+  PASS REA_WAKARU_COMMAND is absolute
+  PASS wakaru binary is a real file, readable and executable
+  PASS wakaru banner in the form REA parses
+  PASS wakaru digest is REA's audited build
+  PASS util-linux prlimit (REA's resource limiter)
+
+== firmware / packet / signal ==
+  PASS binwalk
+  PASS unblob
+  PASS tshark
+  PASS capinfos
+  PASS sigrok-cli
+  PASS sigrok backend loads libsigrokdecode
+
+== capture / devices ==
+  PASS mitmdump
+  PASS adb
+  PASS frida binding loads and sees the local device
+
+== debuggers and arch emulation ==
+  PASS gdb
+  PASS gdb-multiarch
+  PASS gdb sources pwndbg
+  PASS qemu-user-static
+  PASS wine
+
+== browsers ==
+  PASS google-chrome
+  PASS playwright chromium
+
+== provider readiness ==
+  PASS doctor: ghidra
+  SKIP doctor: hopper - Hopper not in this image (engine: ghidra)
+
+== ghidra: architecture coverage (multi-arch is the point) ==
+  PASS ghidra analyze linux-x86_64
+  PASS ghidra search linux-aarch64 finds fixture string
+  PASS ghidra search linux-armv7 finds fixture string
+  PASS ghidra search linux-mips32-be finds fixture string
+  PASS ghidra search linux-mips32-le finds fixture string
+  PASS ghidra search linux-riscv64 finds fixture string
+  PASS ghidra search linux-powerpc finds fixture string
+  PASS ghidra search windows-pe-x64 finds fixture string
+
+== ghidra: function and decompiler output ==
+  PASS ghidra function main (x86_64)
+  PASS ghidra decompile main mentions the fixture strings
+  PASS ghidra decompile aarch64 main
+  PASS ghidra decompile mips32 main
+  PASS ghidra instructions of main
+
+== hopper: headless demo analysis ==
+  SKIP hopper analysis - Hopper not in this image (engine: ghidra)
+
+== provider capabilities ==
+  PASS providers listing
+  PASS capabilities listing
+
+== ELF layout (pwntools 4.15.0) ==
+  PASS binary layout: sections and main symbol
+
+== artifact inspection ==
+  PASS rea analyze on an application directory
+  PASS inspect-artifact on a zip bundle
+  PASS extract-artifact on a zip bundle
+
+== Apple static formats (platform-scoped in REA) ==
+  SKIP plist decode - REA routes plists through the Apple composite provider (unavailable on Linux for this input)
+
+== managed code (.NET / ilspycmd) ==
+  PASS managed artifact identity
+  PASS managed members include License.Describe
+  PASS ilspycmd decompiles the fixture assembly
+
+== EVM bytecode ==
+  PASS evm interface selectors
+
+== JavaScript / Electron application graph ==
+  PASS js application graph
+  PASS analysis view projection of saved evidence
+
+== JavaScript source recovery (Wakaru) ==
+  PASS js recovery: provider is Wakaru
+  PASS js recovery: reported version
+  PASS js recovery: completed with no failures
+  PASS js recovery: bundle decompiled into a module
+  PASS js recovery: REA fingerprinted the audited Wakaru build
+  PASS js recovery: published module file is non-empty
+  PASS js recovery: evidence keeps its limitations
+  PASS analysis of the recovered module tree
+
+== historical source import ==
+  PASS reference source import
+
+== families added in REA 6.5.0 ==
+  PASS sqlite schema + row sample
+  PASS wasm artifact: imports/exports and WAT
+  PASS go-binary metadata probe
+
+== firmware (binwalk 3.1.x + unblob 26.6.x) ==
+  PASS firmware regions (binwalk)
+  PASS firmware extraction (unblob)
+
+== HTTP captures ==
+  PASS HAR 1.2 capture
+  PASS native mitmproxy capture decode
+
+== browser: CDP observation ==
+  PASS browser target discovery (CDP)
+  PASS browser page capture (DOM/scripts)
+  PASS browser screenshot capture
+
+== browser: Playwright scenario ==
+  PASS playwright launch + click + DOM capture
+
+== process behaviour capture (native PTY) ==
+  PASS pty process capture
+
+== packet captures (tshark 4.x) ==
+  PASS pcap client inspection
+  PASS pcap capture: udp fields
+  PASS pcap summary
+
+== recorded signals (sigrok-cli 0.7.2 + libsigrokdecode) ==
+  PASS sigrok decoder inventory
+  PASS vcd UART decode
+
+== Frida (JS instrumentation) ==
+  PASS frida binding resolves from REA
+  PASS rea frida device inventory
+
+== Android: adb + Apktool + JADX engine ==
+  PASS adb client inspection
+  PASS adb device listing (no device attached is a valid answer)
+  PASS apktool client inspection
+  PASS apktool runs as a launcher
+  PASS jadx engine jar loads under java 21
+
+== IDA provider (bring your own install + licence) ==
+  SKIP ida doctor - REA_IDA_MCP_CONFIG not set (see docs/BYO-LICENSES.md)
+  PASS ida registration templates present
+  SKIP IDADIR mount - not in this image (engine: ghidra)
+
+== JEB provider (bring your own licence) ==
+  SKIP jeb client - REA_JEB_MCP_URL not set (bring your own JEB)
+
+== Hopper licence/state layout ==
+  SKIP hopper application-support dir - not in this image (engine: ghidra)
+
+== import-export / comparison surface ==
+  PASS compare command rejects identical artefacts cleanly
+
+== MCP over stdio (docker exec / subprocess) ==
+  PASS mcp initialize + tools/list (207 tools)
+  PASS mcp tools/call: engine-free tool returned data
+  PASS mcp open_binary via ghidra
+  PASS mcp analyze_function via ghidra
+
+== MCP over Streamable HTTP (supergateway bridge) ==
+  PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261014T211142Z
-date:      2026-10-14T21:23:13Z
+run:       20261015T213718Z
+date:      2026-10-15T21:48:57Z
 image:     ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
-node:      v24.21.0
+node:      v24.22.0
 rea:       6.5.0
-passed:    95
+passed:    108
 failed:    0
 skipped:   8
 
@@ -52,17 +537,243 @@ skipped checks:
   - jeb client
   - hopper application-support dir
 
-===============================================================================
-engine: hopper     image: ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64
-===============================================================================
+report: /work/verify-reports/20261015T213718Z
+passed=108 failed=0 skipped=8
+
+==============================================================
+=== verifying engine: hopper  (ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64)
+==============================================================
+running harness in ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64 as 10000:10000
+[rea-agent] loaded overrides from /etc/rea/rea.env
+[rea-agent] engine profile: hopper
+[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261015T214859Z  out=/work/verify-reports/20261015T214859Z
+
+== fixtures ==
+building C fixtures in /tmp/rea-verify/fixtures
+  + fixture-x86_64.elf
+  + fixture-aarch64.elf (aarch64)
+  + fixture-armv7.elf (arm)
+  + fixture-mips.elf (big-endian MIPS32)
+  + fixture-mipsel.elf (little-endian MIPS32)
+  + fixture-riscv64.elf (riscv64)
+  + fixture-ppc.elf (PowerPC)
+  + fixture-win64.exe (PE32+)
+  + module.wasm
+  + fixture.sqlite
+  + session.har
+  + Info.plist
+  + jsapp/
+  + jsbundle/bundle.min.js
+  + www/index.html
+  + fixture.pcap
+  + uart.vcd
+  + firmware.bin
+  + runtime.hex
+  + process-scenario.json, browser-scenario.json
+  + bundle.zip
+  dotnet: Restore succeeded.
+  dotnet: 
+  dotnet: 
+  dotnet: Build succeeded.
+  dotnet:     0 Warning(s)
+  dotnet:     0 Error(s)
+  dotnet: 
+  dotnet: Time Elapsed 00:00:02.10
+  + dotnet-app/bin/Release/net8.0/VerifyLib.dll
+fixtures ready in /tmp/rea-verify/fixtures
+
+== runtime ==
+  PASS node version
+  PASS npm present
+  PASS rea version
+  PASS rea providers
+
+== engine profile ==
+  PASS declared engine
+  PASS engine env file
+  PASS rea wrapper injects engine env
+  PASS rea wrapper is the engine-injecting shell script
+
+== container healthcheck ==
+  PASS healthcheck reports healthy
+  PASS healthcheck (deep) reports healthy
+
+== analysis engines ==
+  PASS java runtime
+  PASS javac present
+  SKIP ghidra installation - not in this image (engine: hopper)
+  PASS hopper launcher executable
+  PASS hopper shared libraries resolve (0 = none missing)
+  PASS hopper launcher digest is one REA accepts
+  PASS xvfb present
+
+== static analysis helpers ==
+  PASS pwntools venv python
+  PASS wabt 1.0.42
+  PASS jadx headless MCP jar
+  PASS jadx jar is a runnable archive
+  PASS apktool launcher
+  PASS dotnet sdk
+  PASS ilspycmd
+
+== javascript source recovery (Wakaru) ==
+  PASS REA_WAKARU_COMMAND is absolute
+  PASS wakaru binary is a real file, readable and executable
+  PASS wakaru banner in the form REA parses
+  PASS wakaru digest is REA's audited build
+  PASS util-linux prlimit (REA's resource limiter)
+
+== firmware / packet / signal ==
+  PASS binwalk
+  PASS unblob
+  PASS tshark
+  PASS capinfos
+  PASS sigrok-cli
+  PASS sigrok backend loads libsigrokdecode
+
+== capture / devices ==
+  PASS mitmdump
+  PASS adb
+  PASS frida binding loads and sees the local device
+
+== debuggers and arch emulation ==
+  PASS gdb
+  PASS gdb-multiarch
+  PASS gdb sources pwndbg
+  PASS qemu-user-static
+  PASS wine
+
+== browsers ==
+  PASS google-chrome
+  PASS playwright chromium
+
+== provider readiness ==
+  SKIP doctor: ghidra - not in this image (engine: hopper)
+  PASS doctor: hopper
+
+== ghidra: architecture coverage (multi-arch is the point) ==
+  SKIP ghidra analysis - not in this image (engine: hopper)
+
+== hopper: headless demo analysis ==
+  PASS hopper analyze x86_64
+  PASS hopper decompile main
+  PASS hopper string search
+
+== provider capabilities ==
+  PASS providers listing
+  PASS capabilities listing
+
+== ELF layout (pwntools 4.15.0) ==
+  PASS binary layout: sections and main symbol
+
+== artifact inspection ==
+  PASS rea analyze on an application directory
+  PASS inspect-artifact on a zip bundle
+  PASS extract-artifact on a zip bundle
+
+== Apple static formats (platform-scoped in REA) ==
+  SKIP plist decode - REA routes plists through the Apple composite provider (unavailable on Linux for this input)
+
+== managed code (.NET / ilspycmd) ==
+  PASS managed artifact identity
+  PASS managed members include License.Describe
+  PASS ilspycmd decompiles the fixture assembly
+
+== EVM bytecode ==
+  PASS evm interface selectors
+
+== JavaScript / Electron application graph ==
+  PASS js application graph
+  PASS analysis view projection of saved evidence
+
+== JavaScript source recovery (Wakaru) ==
+  PASS js recovery: provider is Wakaru
+  PASS js recovery: reported version
+  PASS js recovery: completed with no failures
+  PASS js recovery: bundle decompiled into a module
+  PASS js recovery: REA fingerprinted the audited Wakaru build
+  PASS js recovery: published module file is non-empty
+  PASS js recovery: evidence keeps its limitations
+  PASS analysis of the recovered module tree
+
+== historical source import ==
+  PASS reference source import
+
+== families added in REA 6.5.0 ==
+  PASS sqlite schema + row sample
+  PASS wasm artifact: imports/exports and WAT
+  PASS go-binary metadata probe
+
+== firmware (binwalk 3.1.x + unblob 26.6.x) ==
+  PASS firmware regions (binwalk)
+  PASS firmware extraction (unblob)
+
+== HTTP captures ==
+  PASS HAR 1.2 capture
+  PASS native mitmproxy capture decode
+
+== browser: CDP observation ==
+  PASS browser target discovery (CDP)
+  PASS browser page capture (DOM/scripts)
+  PASS browser screenshot capture
+
+== browser: Playwright scenario ==
+  PASS playwright launch + click + DOM capture
+
+== process behaviour capture (native PTY) ==
+  PASS pty process capture
+
+== packet captures (tshark 4.x) ==
+  PASS pcap client inspection
+  PASS pcap capture: udp fields
+  PASS pcap summary
+
+== recorded signals (sigrok-cli 0.7.2 + libsigrokdecode) ==
+  PASS sigrok decoder inventory
+  PASS vcd UART decode
+
+== Frida (JS instrumentation) ==
+  PASS frida binding resolves from REA
+  PASS rea frida device inventory
+
+== Android: adb + Apktool + JADX engine ==
+  PASS adb client inspection
+  PASS adb device listing (no device attached is a valid answer)
+  PASS apktool client inspection
+  PASS apktool runs as a launcher
+  PASS jadx engine jar loads under java 21
+
+== IDA provider (bring your own install + licence) ==
+  SKIP ida doctor - REA_IDA_MCP_CONFIG not set (see docs/BYO-LICENSES.md)
+  PASS ida registration templates present
+  SKIP IDADIR mount - not in this image (engine: hopper)
+
+== JEB provider (bring your own licence) ==
+  SKIP jeb client - REA_JEB_MCP_URL not set (bring your own JEB)
+
+== Hopper licence/state layout ==
+  PASS hopper application-support dir
+
+== import-export / comparison surface ==
+  PASS compare command rejects identical artefacts cleanly
+
+== MCP over stdio (docker exec / subprocess) ==
+  PASS mcp initialize + tools/list (207 tools)
+  PASS mcp tools/call: engine-free tool returned data
+  PASS mcp open_binary via hopper
+  PASS mcp analyze_function via hopper
+
+== MCP over Streamable HTTP (supergateway bridge) ==
+  PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261014T212315Z
-date:      2026-10-14T21:24:54Z
+run:       20261015T214859Z
+date:      2026-10-15T21:50:42Z
 image:     ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
-node:      v24.21.0
+node:      v24.22.0
 rea:       6.5.0
-passed:    88
+passed:    101
 failed:    0
 skipped:   7
 
@@ -75,17 +786,241 @@ skipped checks:
   - IDADIR mount
   - jeb client
 
-===============================================================================
-engine: ida        image: ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64
-===============================================================================
+report: /work/verify-reports/20261015T214859Z
+passed=101 failed=0 skipped=7
+
+==============================================================
+=== verifying engine: ida  (ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64)
+==============================================================
+running harness in ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64 as 10000:10000
+[rea-agent] loaded overrides from /etc/rea/rea.env
+[rea-agent] engine profile: ida
+[rea-agent] note: this image bundles no analysis engine. Provide IDA + a registration:
+[rea-agent] note:   /opt/rea/scripts/setup-ida-mcp.sh <idalib|official|sidecar|attached|native>
+[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261015T215044Z  out=/work/verify-reports/20261015T215044Z
+
+== fixtures ==
+building C fixtures in /tmp/rea-verify/fixtures
+  + fixture-x86_64.elf
+  + fixture-aarch64.elf (aarch64)
+  + fixture-armv7.elf (arm)
+  + fixture-mips.elf (big-endian MIPS32)
+  + fixture-mipsel.elf (little-endian MIPS32)
+  + fixture-riscv64.elf (riscv64)
+  + fixture-ppc.elf (PowerPC)
+  + fixture-win64.exe (PE32+)
+  + module.wasm
+  + fixture.sqlite
+  + session.har
+  + Info.plist
+  + jsapp/
+  + jsbundle/bundle.min.js
+  + www/index.html
+  + fixture.pcap
+  + uart.vcd
+  + firmware.bin
+  + runtime.hex
+  + process-scenario.json, browser-scenario.json
+  + bundle.zip
+  dotnet: Restore succeeded.
+  dotnet: 
+  dotnet: 
+  dotnet: Build succeeded.
+  dotnet:     0 Warning(s)
+  dotnet:     0 Error(s)
+  dotnet: 
+  dotnet: Time Elapsed 00:00:02.18
+  + dotnet-app/bin/Release/net8.0/VerifyLib.dll
+fixtures ready in /tmp/rea-verify/fixtures
+
+== runtime ==
+  PASS node version
+  PASS npm present
+  PASS rea version
+  PASS rea providers (no bundled engine)
+
+== engine profile ==
+  PASS declared engine
+  PASS engine env file
+  PASS rea wrapper injects engine env
+  PASS rea wrapper is the engine-injecting shell script
+
+== container healthcheck ==
+  PASS healthcheck reports healthy
+  PASS healthcheck (deep) names the missing IDA registration
+
+== analysis engines ==
+  PASS java runtime
+  PASS javac present
+  SKIP ghidra installation - not in this image (engine: ida)
+  SKIP hopper installation - not in this image (engine: ida)
+  PASS IDA mount point
+  PASS IDA licence placement helpers
+
+== static analysis helpers ==
+  PASS pwntools venv python
+  PASS wabt 1.0.42
+  PASS jadx headless MCP jar
+  PASS jadx jar is a runnable archive
+  PASS apktool launcher
+  PASS dotnet sdk
+  PASS ilspycmd
+
+== javascript source recovery (Wakaru) ==
+  PASS REA_WAKARU_COMMAND is absolute
+  PASS wakaru binary is a real file, readable and executable
+  PASS wakaru banner in the form REA parses
+  PASS wakaru digest is REA's audited build
+  PASS util-linux prlimit (REA's resource limiter)
+
+== firmware / packet / signal ==
+  PASS binwalk
+  PASS unblob
+  PASS tshark
+  PASS capinfos
+  PASS sigrok-cli
+  PASS sigrok backend loads libsigrokdecode
+
+== capture / devices ==
+  PASS mitmdump
+  PASS adb
+  PASS frida binding loads and sees the local device
+
+== debuggers and arch emulation ==
+  PASS gdb
+  PASS gdb-multiarch
+  PASS gdb sources pwndbg
+  PASS qemu-user-static
+  PASS wine
+
+== browsers ==
+  PASS google-chrome
+  PASS playwright chromium
+
+== provider readiness ==
+  SKIP doctor: ghidra - not in this image (engine: ida)
+  SKIP doctor: hopper - Hopper not in this image (engine: ida)
+
+== ghidra: architecture coverage (multi-arch is the point) ==
+  SKIP ghidra analysis - not in this image (engine: ida)
+
+== hopper: headless demo analysis ==
+  SKIP hopper analysis - IDA image: register IDA (see docs/ida-variants.md) to analyse natively
+
+== provider capabilities ==
+  PASS providers listing
+  PASS capabilities listing
+
+== ELF layout (pwntools 4.15.0) ==
+  PASS binary layout: sections and main symbol
+
+== artifact inspection ==
+  PASS rea analyze on an application directory
+  PASS inspect-artifact on a zip bundle
+  PASS extract-artifact on a zip bundle
+
+== Apple static formats (platform-scoped in REA) ==
+  SKIP plist decode - REA routes plists through the Apple composite provider (unavailable on Linux for this input)
+
+== managed code (.NET / ilspycmd) ==
+  PASS managed artifact identity
+  PASS managed members include License.Describe
+  PASS ilspycmd decompiles the fixture assembly
+
+== EVM bytecode ==
+  PASS evm interface selectors
+
+== JavaScript / Electron application graph ==
+  PASS js application graph
+  PASS analysis view projection of saved evidence
+
+== JavaScript source recovery (Wakaru) ==
+  PASS js recovery: provider is Wakaru
+  PASS js recovery: reported version
+  PASS js recovery: completed with no failures
+  PASS js recovery: bundle decompiled into a module
+  PASS js recovery: REA fingerprinted the audited Wakaru build
+  PASS js recovery: published module file is non-empty
+  PASS js recovery: evidence keeps its limitations
+  PASS analysis of the recovered module tree
+
+== historical source import ==
+  PASS reference source import
+
+== families added in REA 6.5.0 ==
+  PASS sqlite schema + row sample
+  PASS wasm artifact: imports/exports and WAT
+  PASS go-binary metadata probe
+
+== firmware (binwalk 3.1.x + unblob 26.6.x) ==
+  PASS firmware regions (binwalk)
+  PASS firmware extraction (unblob)
+
+== HTTP captures ==
+  PASS HAR 1.2 capture
+  PASS native mitmproxy capture decode
+
+== browser: CDP observation ==
+  PASS browser target discovery (CDP)
+  PASS browser page capture (DOM/scripts)
+  PASS browser screenshot capture
+
+== browser: Playwright scenario ==
+  PASS playwright launch + click + DOM capture
+
+== process behaviour capture (native PTY) ==
+  PASS pty process capture
+
+== packet captures (tshark 4.x) ==
+  PASS pcap client inspection
+  PASS pcap capture: udp fields
+  PASS pcap summary
+
+== recorded signals (sigrok-cli 0.7.2 + libsigrokdecode) ==
+  PASS sigrok decoder inventory
+  PASS vcd UART decode
+
+== Frida (JS instrumentation) ==
+  PASS frida binding resolves from REA
+  PASS rea frida device inventory
+
+== Android: adb + Apktool + JADX engine ==
+  PASS adb client inspection
+  PASS adb device listing (no device attached is a valid answer)
+  PASS apktool client inspection
+  PASS apktool runs as a launcher
+  PASS jadx engine jar loads under java 21
+
+== IDA provider (bring your own install + licence) ==
+  SKIP ida doctor - REA_IDA_MCP_CONFIG not set (see docs/BYO-LICENSES.md)
+  PASS ida registration templates present
+  PASS IDADIR mount
+
+== JEB provider (bring your own licence) ==
+  SKIP jeb client - REA_JEB_MCP_URL not set (bring your own JEB)
+
+== Hopper licence/state layout ==
+  SKIP hopper application-support dir - not in this image (engine: ida)
+
+== import-export / comparison surface ==
+  PASS compare command rejects identical artefacts cleanly
+
+== MCP over stdio (docker exec / subprocess) ==
+  PASS mcp initialize + tools/list (207 tools)
+  PASS mcp tools/call: engine-free tool returned data
+  SKIP mcp open_binary/analyze_function - disabled or fixture missing
+
+== MCP over Streamable HTTP (supergateway bridge) ==
+  PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261014T212456Z
-date:      2026-10-14T21:26:22Z
+run:       20261015T215044Z
+date:      2026-10-15T21:52:15Z
 image:     ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
-node:      v24.21.0
+node:      v24.22.0
 rea:       6.5.0
-passed:    80
+passed:    93
 failed:    0
 skipped:   11
 
@@ -101,3 +1036,18 @@ skipped checks:
   - jeb client
   - hopper application-support dir
   - mcp open_binary/analyze_function
+
+report: /work/verify-reports/20261015T215044Z
+passed=93 failed=0 skipped=11
+
+==============================================================
+=== per-engine results
+==============================================================
+ENGINE   COUNTS                                 EXIT      RUN
+all      passed=120 failed=0 skipped=3          exit=0    20261015T212528Z
+ghidra   passed=108 failed=0 skipped=8          exit=0    20261015T213718Z
+hopper   passed=101 failed=0 skipped=7          exit=0    20261015T214859Z
+ida      passed=93 failed=0 skipped=11          exit=0    20261015T215044Z
+
+all verified engine images passed
+EXIT=0

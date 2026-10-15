@@ -32,7 +32,7 @@ in `docker/rea.env.example`.
 | Run foreign-architecture Linux binaries     | `qemu-user-static` for every qemu target (also usable as `qemu-mips -L /usr/mips-linux-gnu ...`) |
 | Run Windows PE binaries                     | `wine` / `wine64`                                              |
 | Debug foreign binaries                      | `gdb-multiarch`, `gdbserver` (via `gdb-multiarch --args`), `qemu-*` user-mode gdbstub (`-g 1234`) |
-| Emulate instructions statically             | Unicorn 2.1.2 inside REA's pwntools venv (used by `inspect-binary-layout`) |
+| Emulate instructions statically             | Unicorn 2.1.2 inside REA's pwntools venv (used by `inspect-binary-layout`; held at 2.1.2 because pwntools 4.15.0 excludes 2.1.3/2.1.4) |
 | Cross-platform core dumps                   | `inspect-recorded-crash` interprets x86-64 **and** AArch64 ELF64 cores |
 | Non-Linux formats                           | Mach-O/FAT/FAT64, PE/PE32+, DOS MZ/COM, ELF, raw binary imports, Amiga/C64 containers (Ghidra) |
 

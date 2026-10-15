@@ -189,6 +189,17 @@ module.exports = { exportReport };
 EOF
 echo "  + jsapp/"
 
+# --- Minified bundle for JavaScript source recovery (Wakaru) ------------------
+# A deliberately minified, single-IIFE bundle: this is the shape REA's
+# recover_javascript_sources exists for (unpack a production bundle back into
+# readable modules), and it is written here rather than downloaded so the
+# harness stays offline and deterministic.
+mkdir -p "$FIX/jsbundle"
+cat >"$FIX/jsbundle/bundle.min.js" <<'EOF'
+(function(){"use strict";var n=0;function c(){n++;return "click "+n}function d(a){return a.map(function(x){return x*2})}window.addEventListener("load",function(){document.body.addEventListener("click",c),console.log("app ready",d([1,2,3]))})})();
+EOF
+echo "  + jsbundle/bundle.min.js"
+
 # --- Web page for CDP / Playwright captures ----------------------------------
 mkdir -p "$FIX/www"
 cat >"$FIX/www/index.html" <<'EOF'

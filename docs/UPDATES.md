@@ -8,8 +8,14 @@ make check-updates          # or: scripts/check-updates.py
 ```
 
 It reads every pin out of `Dockerfile`, asks each upstream what it currently
-ships, and prints one row per component in about five seconds. Exit code is 1
-when something needs action, so it works as a gate as well as a report.
+ships, and prints one row per component in about five seconds.
+
+Exit status follows the policy below — `1` only when the image is **wrong now**
+(a pin older than what REA admits, a capability REA advertises with no tool
+installed, repo files that disagree, or a new `rea-agents` release, which is the
+trigger to move everything). A merely-newer upstream release is reported as
+`OUTDATED` and does **not** fail the check, because by policy it waits for the
+next REA release.
 
 | mode | use |
 | --- | --- |
@@ -63,6 +69,28 @@ REA re-derives the expectations instead of relying on this document's memory.
 
 ## The general loop
 
+### When to bump at all
+
+**Do not bump anything unless REA itself is out of date.** The pins exist to
+match the REA release the image ships, and REA validates engines by digest and
+helper tools by version banner; a third-party bump made on its own schedule is
+how you end up running builds REA never verified. So the trigger is a new
+`rea-agents`: read what it admits, move the pins to that, and rebuild.
+
+Two exceptions, and only these:
+
+1. **A drift `BEHIND-REA` on any row** — our pin is older than what the *current*
+   REA admits, i.e. the image is already wrong. Fix immediately.
+2. **A capability gap (`MISSING`)** — REA advertises an operation whose tool we do
+   not ship. Also already wrong, and it looks like a broken install to a user.
+
+Everything else (`OUTDATED`, `info`) waits for the next REA release. The reason to
+hold is not conservatism for its own sake: `docs/VERIFICATION.md` records which
+builds were actually exercised together, and bumping out of step invalidates that
+without adding any verified capability.
+
+### The loop
+
 1. `make check-updates` — see what moved and why it matters.
 2. Bump the pin in the `Dockerfile` (`ARG …`), and in `.env.example` if it is
    mirrored there.
@@ -73,8 +101,9 @@ REA re-derives the expectations instead of relying on this document's memory.
    make build-ghidra                      # or build / build-hopper / build-ida
    scripts/verify.sh --engine ghidra      # full harness for that image
    ```
-5. Update docs that *name* versions (README, `docs/IMAGES.md`,
-   `docs/VERIFICATION.md`) and the size table if it changed (`make sizes`).
+5. Update docs that *name* versions (README, `docs/ARCHITECTURE.md`,
+   `docs/MULTIARCH.md`, `docs/IMAGES.md`, `docs/VERIFICATION.md`) and the size
+   table if it changed (`make sizes`).
 6. Commit with the upstream URL and the check you ran; push. CI re-validates and
    republishes under the new tag.
 
@@ -198,6 +227,7 @@ the version REA admits.
 | unblob | `UNBLOB_VERSION` | `pip install "unblob==…"` into `/opt/venvs/unblob` | `REA_UNBLOB_COMMAND` | `static` |
 | WABT | `WABT_VERSION` | GitHub release tarball + sha256, `/opt/wabt` | `REA_WABT_BIN_DIRECTORY` | `static` |
 | jadx-headless-mcp | `JADX_MCP_VERSION` | GitHub release jar, `/opt/jadx` | `REA_JADX_MCP_JAR` | `static` |
+| Wakaru | `WAKARU_VERSION` + `WAKARU_LINUX_X64_SHA256` | GitHub release asset, `/opt/wakaru` | `REA_WAKARU_COMMAND` | `tools` + `static` |
 | apktool | `APKTOOL_VERSION` | GitHub release jar + wrapper script | `REA_APKTOOL_COMMAND` | `static` |
 | pwntools / pyelftools / unicorn | `PWTOOLS_VERSION` / `PYELFTOOLS_VERSION` / `UNICORN_VERSION` | one venv, `/opt/venvs/pwntools` | `REA_PWNTOOLS_PYTHON` | `static` |
 | TShark / capinfos | — (apt) | `apt-get install tshark` | `REA_TSHARK_COMMAND`, `REA_CAPINFOS_COMMAND` | `capture` |
@@ -212,6 +242,20 @@ Notes:
   (`wabt-<ver>-linux-x64.tar.gz`, verified against its published `.sha256`).
 * **Apktool is deliberately held at 2.x.** REA's floor is 2.7.0 and 3.x changes
   the output layout; the checker reports 3.x as optional rather than required.
+* **Wakaru is pinned twice on purpose**: `WAKARU_VERSION` (the release) and
+  `WAKARU_LINUX_X64_SHA256` (the exact asset). REA fingerprints the executed
+  binary and its docs record the digest of the build it audited, so a matching
+  version number is not enough — the checker compares our digest with REA's own
+  documented value (`wakaru binary digest` row), and the harness re-checks it in
+  the image. Install the **release asset**, never the `node_modules/.bin` shim.
+* **Some pins are held by another pin, and that is not an oversight.** Unicorn is
+  the live example: 2.1.4 is newer upstream, but pwntools 4.15.0 declares
+  `unicorn !=2.1.3, !=2.1.4`, so pip refuses it (`ResolutionImpossible`) — the
+  build fails loudly rather than installing something inconsistent. The checker
+  reports these as `info` with `held on <pin>: <reason>` (the `HELD` map in
+  `scripts/check-updates.py`) instead of as an available update. When you add an
+  entry there, put the constraint in the `Dockerfile` comment too: the build and
+  the checker should tell the same story.
 * **ilspycmd has no admitted version** — REA only requires a runnable binary, so
   the checker reports a newer NuGet release as information. Every `.NET` fixture
   in the harness exercises it, so bumping is cheap but not free.
@@ -248,10 +292,14 @@ with the reason, so the row is expected rather than surprising.
 
 | gap | why |
 | --- | --- |
-| Wakaru (`recover_javascript_sources`) | not installed yet — REA admits ^1.13.0; the procedure above is the fix |
 | IDA / JEB | licensable vendor software: bring-your-own by design, never downloaded |
 | Hopper licensed builds | same; only the vendor demo package is installed |
 | Apple composite providers (plist etc.) | provider-scoped, not a host capability |
+
+Wakaru was the first real `MISSING` row produced by the checker — REA 6.5.0
+advertised `recover_javascript_sources` while the image shipped nothing for it, so
+the capability reported `provider_missing`. The procedure above is what fixed it;
+the section stays as the worked example.
 
 ---
 
@@ -307,8 +355,10 @@ and it is separate from the image build on purpose: a red `updates` run means
 * the markdown report lands in the run summary
   (Actions → *updates* → the run → **Summary**);
 * the JSON report is uploaded as the `update-check` artifact;
-* the job **fails when anything is actionable** — the failure is the reminder,
-  and it names the component plus both candidates;
+* the job **fails when the image is wrong now** — a pin behind what REA admits, a
+  capability REA advertises with no tool installed, repo files that disagree, or a
+  new REA release. Merely-newer upstream releases are listed in the summary as
+  waiting for the next release and do not fail the run;
 * it warns when a row could **not be checked** (`unknown`). An unverifiable row
   is not a pass: it means a lookup failed, so that run proved nothing about the
   component. The job sets `GH_TOKEN` so GitHub-sourced rows use the
@@ -342,6 +392,17 @@ passes when it cannot see upstream is worse than no check.
 
 ## Traps worth remembering
 
+* **The download cache is shared across builds and keyed by filename, not by
+  version.** `/var/cache/rea-dl` is a `--mount=type=cache` target: `[ -f x ] ||
+  curl … x` skips the download when `x` is already there. So any cached file whose
+  name does not carry the version is *stale the moment the pin moves* — Node's
+  `SHASUMS256.txt` failed this way during the 24.21→24.22 bump ("no properly
+  formatted checksum lines found", because the cached file still described the old
+  tarball). Fix the name (`SHASUMS256-${NODE_VERSION}.txt`), don't delete the
+  cache: a version-qualified name makes the workspace self-healing and keeps the
+  warm cache useful. Check for this pattern on every cached download — the ones
+  that are deliberately version-less (Google Chrome's `google-chrome.deb`, "always
+  current stable") are the exception, not the rule.
 * **`config_drift` from `rea doctor` is not an install failure.** It usually
   means the engine build is newer than the admitted one.
 * **A Hopper version number proves nothing** — the gate is the launcher digest.

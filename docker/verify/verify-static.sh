@@ -84,6 +84,39 @@ else
     _skip "js application graph" "fixture missing"
 fi
 
+section "JavaScript source recovery (Wakaru)"
+# REA's own documented chain: recover readable modules from a minified bundle,
+# then analyse the recovered tree. The assertions are on schema fields (provider,
+# status, per-module status, the fingerprinted executable digest) rather than on
+# incidental text, and the digest proves REA ran the audited asset this image pins.
+if [ -s "$FIX/jsbundle/bundle.min.js" ]; then
+    rm -rf "$FIX/recovered"
+    if rea recover-javascript-sources "$FIX/jsbundle/bundle.min.js" "$FIX/recovered" \
+           --json >"$FIX/recovery.json" 2>"$FIX/recovery.err"; then
+        check_json_file "js recovery: provider is Wakaru" '.provider.id == "wakaru"' "$FIX/recovery.json"
+        check_json_file "js recovery: reported version" '.provider.version | startswith("1.14")' "$FIX/recovery.json"
+        check_json_file "js recovery: completed with no failures" \
+            '.normalized_result.status == "complete" and .normalized_result.failed == 0' "$FIX/recovery.json"
+        check_json_file "js recovery: bundle decompiled into a module" \
+            '.normalized_result.modules[0].reported_status == "decompiled"' "$FIX/recovery.json"
+        check_json_file "js recovery: REA fingerprinted the audited Wakaru build" \
+            '.normalized_result.engine.executable.sha256 == "664fa06782a61eda7ed15885134b52525fd565dd77607e642062ceb6cd927c38"' \
+            "$FIX/recovery.json"
+        check "js recovery: published module file is non-empty" "." \
+            -- bash -c "test -s \"$FIX/recovered/modules/bundle.js\" && wc -c <\"$FIX/recovered/modules/bundle.js\""
+        check "js recovery: evidence keeps its limitations" "derived artifacts" \
+            -- bash -c "jq -r '.normalized_result.limitations[0]' \"$FIX/recovery.json\""
+        # recovered modules are a usable analysis input, which is the point of the
+        # operation - analyse them with the same tool the jsapp fixture uses
+        check_rea "analysis of the recovered module tree" analyze-javascript-application "." \
+            -- "$FIX/recovered/modules" --json
+    else
+        _bad "js source recovery" "recover-javascript-sources exited non-zero; see $FIX/recovery.err"
+    fi
+else
+    _skip "js source recovery" "fixture missing"
+fi
+
 section "historical source import"
 if [ -d "$FIX/jsapp/src" ]; then
     check_rea "reference source import" import-reference-source "." -- "$FIX/jsapp/src" --json

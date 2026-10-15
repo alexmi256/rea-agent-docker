@@ -74,6 +74,23 @@ check "apktool launcher"      "2\.[0-9]+"              -- apktool --version
 check "dotnet sdk"            "8\."                    -- dotnet --version
 check "ilspycmd"              "ILSpy|[0-9]+\.[0-9]+"   -- "$REA_ILSPY_CMD_PATH" --version
 
+section "javascript source recovery (Wakaru)"
+# REA's admission rules, asserted one by one: an absolute REA_WAKARU_COMMAND, a
+# readable+executable regular file, the banner in the exact form REA parses
+# (`wakaru <semver>` inside its accepted range), the audited digest, and
+# util-linux prlimit as a regular executable - REA checks all of these before it
+# will run the capability at all.
+check "REA_WAKARU_COMMAND is absolute" "^/opt/wakaru/wakaru$" \
+    -- bash -c 'printf "%s\n" "${REA_WAKARU_COMMAND:-unset}"'
+check "wakaru binary is a real file, readable and executable" "^/opt/wakaru/wakaru$" \
+    -- bash -c '[ -f "$REA_WAKARU_COMMAND" ] && [ -x "$REA_WAKARU_COMMAND" ] && realpath "$REA_WAKARU_COMMAND"'
+check "wakaru banner in the form REA parses" "^wakaru 1\.14\.0$" \
+    -- "$REA_WAKARU_COMMAND" --version
+check "wakaru digest is REA's audited build" "664fa06782a61eda7ed15885134b52525fd565dd77607e642062ceb6cd927c38" \
+    -- sha256sum "$REA_WAKARU_COMMAND"
+check "util-linux prlimit (REA's resource limiter)" "^/usr/bin/prlimit" \
+    -- bash -c 'test -f /usr/bin/prlimit && [ -x /usr/bin/prlimit ] && realpath /usr/bin/prlimit'
+
 section "firmware / packet / signal"
 check "binwalk"               "Binwalk|binwalk|3\."    -- binwalk --version
 check "unblob"                "26\.6"                  -- "$REA_UNBLOB_COMMAND" --version

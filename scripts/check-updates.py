@@ -14,6 +14,15 @@
 #   1. the newest thing upstream ships, and
 #   2. what the pinned REA release actually ADMITS.
 #
+# Exit status follows the project's update policy (docs/UPDATES.md):
+#   1 = the image is wrong NOW - a pin is older than what REA admits
+#       (`BEHIND-REA`), REA advertises a capability with no tool installed
+#       (`MISSING`), repo files disagree (`MISMATCH`), or a new REA release exists
+#       (`NEW REA`, the trigger to move everything).
+#   0 = nothing wrong. `OUTDATED` rows (newer upstream, nothing REA admits) are
+#       reported and deliberately do NOT fail: by policy they wait for the next
+#       rea-agents release.
+#
 # (2) is the one that matters for the engine and helper tools. REA 6.5.0 admits
 # Ghidra 12.1.4, Hopper 6.4.2-by-digest, Binwalk 3.1.x, Unblob 26.6.x, WABT
 # 1.0.42, sigrok-cli 0.7.2, TShark 4.x, jadx-headless-mcp 0.7.1, pwntools
@@ -63,11 +72,24 @@ REA_SOURCES = {
     "tools": "src/application/CapabilityInventory.ts",
 }
 
-# statuses that mean "do something"
-ACTIONABLE = {"outdated", "behind-rea", "missing", "mismatch"}
+# Statuses that mean "the image is wrong right now" - these fail the check.
+# `outdated` is deliberately NOT here: this project's policy is that a newer
+# upstream release waits for the next REA release, so a merely-newer tool is
+# reported but must not turn the weekly job red (see docs/UPDATES.md).
+ACTIONABLE = {"behind-rea", "missing", "mismatch", "new-rea"}
+# Reported, never failing: newer upstream, no REA release shipped it yet.
+PENDING = {"outdated"}
+
+# Components deliberately held back from a newer upstream, with the reason. These
+# are reported as `info` ("held") rather than as pending updates, so a reader can
+# see the decision instead of assuming an oversight.
+HELD = {
+    "unicorn": "pwntools 4.15.0 declares unicorn !=2.1.3,!=2.1.4 - pip refuses 2.1.4",
+}
 STATUS_LABEL = {
     "ok": "ok",
     "outdated": "OUTDATED",
+    "new-rea": "NEW REA",
     "behind-rea": "BEHIND-REA",
     "ahead": "ahead",
     "missing": "MISSING",
@@ -380,8 +402,10 @@ def check_rea(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissions)
             row.status = "unknown"
             row.note = "could not compare versions"
         elif order < 0:
-            row.status = "outdated"
-            row.hint = "bump REA_VERSION, then rebuild and run the harness (see docs/UPDATES.md)"
+            row.status = "new-rea"
+            row.hint = ("a new REA is the trigger for everything else: read what it admits "
+                        "(the columns below re-derive), move the pins to match, rebuild and "
+                        "run the harness (docs/UPDATES.md)")
         node_engines = str((data.get("engines") or {}).get("node", ""))
         if node_engines:
             row.note = f"engines.node: {node_engines}"
@@ -597,6 +621,12 @@ def tool_row(
 
     order = compare(pinned, row.upstream)
     if order is not None and order < 0 and row.status == "ok":
+        if key in HELD:
+            # newer upstream, but something we ship forbids it - say so, and never
+            # dress it up as an available update
+            row.status = "info"
+            row.note = ((row.note + "; ") if row.note else "") + f"held on {pinned}: {HELD[key]}"
+            return row
         if floor_semantics and admitted:
             # REA states a minimum, not a target: anything at or above the floor
             # is admitted, so a newer upstream is optional rather than required.
@@ -684,17 +714,57 @@ def check_tools(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmission
         row.admits = None
     rows.append(row)
 
-    # Wakaru: REA advertises javascript recovery, we do not install it
-    admitted = admissions.tool("wakaru")
+    # Wakaru: the JavaScript recovery engine REA advertises. Installed since
+    # 6.5.0-era tooling; the upstream is the GitHub release asset the image
+    # fetches (npm mirrors the identical version).
+    wakaru_pin = pins.get("WAKARU_VERSION", "")
+    url = "https://api.github.com/repos/pionxzh/wakaru/releases/latest"
     upstream, error = None, None
     try:
-        upstream = str(npm_latest(fetcher, "wakaru")["version"])
+        upstream = github_latest(fetcher, "pionxzh/wakaru")
     except Exception as exc:  # noqa: BLE001
         error = exc
-    rows.append(tool_row("wakaru", "wakaru (npm)", "", admitted,
-                         "https://registry.npmjs.org/wakaru/latest", upstream, error,
-                         pinned_present=False))
+    rows.append(tool_row("wakaru", "wakaru (GitHub release)", wakaru_pin,
+                         admissions.tool("wakaru"), url, upstream, error,
+                         pinned_present=bool(wakaru_pin)))
     return rows
+
+
+def check_wakaru_digest(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissions) -> list[Row]:
+    """Our Wakaru pin must be the asset REA audited, byte for byte.
+
+    REA fingerprints the executed binary and docs/javascript-recovery.md records
+    the SHA-256 of the build it verified, so a different asset would be running
+    bytes REA never audited even though the version number matches.
+    """
+    pinned = pins.get("WAKARU_LINUX_X64_SHA256", "")
+    url = REA_RAW.format(repo=REA_REPO, version=admissions.version,
+                         path="docs/javascript-recovery.md")
+    row = Row("wakaru-digest", "wakaru binary digest", "REA-admitted tools", "ok",
+              pinned=(pinned[:12] + "…") if pinned else None, source=url)
+    if not pinned:
+        row.status = "missing"
+        row.note = "no WAKARU_LINUX_X64_SHA256 pin, so the fetched asset is unverified"
+        row.hint = "pin the digest REA documents for the verified release"
+        return [row]
+    try:
+        doc = fetcher.text(url)
+    except Exception as exc:  # noqa: BLE001
+        return [unknowable(row, exc)]
+    match = re.search(r"SHA-256\s*`([0-9a-f]{64})`", doc)
+    if not match:
+        return [unknowable(row, RuntimeError("no SHA-256 in REA's javascript-recovery doc"))]
+    documented = match.group(1)
+    row.admits = documented[:12] + "…"
+    release = re.search(r"wakaru/releases/download/v([\d.]+)/", doc)
+    if documented == pinned:
+        row.note = ("matches the digest REA documents for Wakaru "
+                    f"{release.group(1) if release else ''}".strip())
+    else:
+        row.status = "behind-rea"
+        row.note = f"REA documents {documented} for Wakaru {release.group(1) if release else '?'}"
+        row.hint = "install the release asset REA audited, or REA runs unaudited bytes"
+    return [row]
 
 
 def check_misc(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissions) -> list[Row]:
@@ -826,6 +896,7 @@ def main() -> int:
         lambda: check_hopper(fetcher, pins, admissions),
         lambda: check_java(fetcher, pins, admissions),
         lambda: check_tools(fetcher, pins, admissions),
+        lambda: check_wakaru_digest(fetcher, pins, admissions),
         lambda: check_misc(fetcher, pins, admissions),
         lambda: check_actions(fetcher),
     ]
@@ -842,6 +913,7 @@ def main() -> int:
         rows = [r for r in rows if not any(n in r.key.lower() or n in r.group.lower() for n in needles)]
 
     actionable = [r for r in rows if r.status in ACTIONABLE]
+    pending = [r for r in rows if r.status in PENDING]
     unknowns = [r for r in rows if r.status == "unknown"]
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -862,6 +934,7 @@ def main() -> int:
                 "summary": {
                     "rows": len(rows),
                     "actionable": len(actionable),
+                    "pending": len(pending),
                     "unknown": len(unknowns),
                 },
                 "rows": [r.as_dict() for r in rows],
@@ -875,16 +948,29 @@ def main() -> int:
         print()
         print(f"Pins read from `Dockerfile`; REA admission tables read from "
               f"`morluto/rea@rea-agents-{rea_version}`. "
-              f"**{len(actionable)} actionable**, {len(unknowns)} unverifiable, {len(rows)} rows.")
+              f"**{len(actionable)} actionable**, {len(pending)} awaiting the next REA release, "
+              f"{len(unknowns)} unverifiable, {len(rows)} rows.")
         print()
         if actionable:
+            print("**Actionable — the image disagrees with what REA admits:**")
+            print()
             print("| status | component | pinned | upstream | REA admits |")
             print("| --- | --- | --- | --- | --- |")
             for row in actionable:
                 print(f"| **{STATUS_LABEL[row.status]}** | {row.label} | {row.pinned or '-'} | "
                       f"{row.upstream or '-'} | {row.admits or '-'} |")
+            print()
         else:
-            print("Nothing actionable: every pin matches what upstream and REA currently expect.")
+            print("Nothing actionable: every pin matches what REA currently expects.")
+            print()
+        if pending:
+            print("Newer upstream, reported but not applied — by policy these wait for the "
+                  "next `rea-agents` release:")
+            print()
+            print("| component | pinned | upstream |")
+            print("| --- | --- | --- |")
+            for row in pending:
+                print(f"| {row.label} | {row.pinned or '-'} | {row.upstream or '-'} |")
         return 1 if actionable and not args.no_fail else 0
 
     print(f"rea-agent-docker update check — {stamp}")
@@ -926,12 +1012,19 @@ def main() -> int:
                 print(f"             {'':<{width}} {row.note}")
             if row.status in ACTIONABLE and row.hint:
                 print(f"             {'':<{width}} -> {row.hint}")
+            elif row.status in PENDING and row.note:
+                print(f"             {'':<{width}} = newer upstream only - per policy this waits "
+                      "for the next REA release")
         print()
 
-    print(f"{len(rows)} rows: {len(actionable)} actionable, "
-          f"{len(unknowns)} unverifiable, {len(rows) - len(actionable) - len(unknowns)} fine")
+    print(f"{len(rows)} rows: {len(actionable)} actionable, {len(pending)} awaiting the next "
+          f"REA release, {len(unknowns)} unverifiable, "
+          f"{len(rows) - len(actionable) - len(pending) - len(unknowns)} fine")
     if actionable:
         print("See docs/UPDATES.md for what to check and how to apply each bump.")
+    elif pending:
+        print("Nothing wrong: the pins match what REA admits. The newer upstream releases above "
+              "wait for the next rea-agents release (docs/UPDATES.md).")
     return 1 if actionable and not args.no_fail else 0
 
 

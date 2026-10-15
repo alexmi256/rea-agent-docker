@@ -25,17 +25,17 @@ reuses every shared layer from cache. Notable orderings and pins:
 | Layer | Contents | Notable pinned versions |
 | ----- | -------- | ----------------------- |
 | 1 | build/runtime basics: compilers, `gdb`/`gdb-multiarch`, `strace`, `ltrace`, `binutils`, `elfutils`, `yara`, `upx-ucl`, `nasm`, `qemu-user-static`, `binfmt-support`, X11/EGL/GBM/font stack, `xvfb`, `socat`, `tcpdump`, `util-linux` (prlimit) | Ubuntu 24.04 archives |
-| 2 | **Node.js** + npm | 24.21.0 (REA needs 22.19+/24.11+/26+) |
+| 2 | **Node.js** + npm | 24.22.0 (REA needs 22.19+/24.11+/26+) |
 | 3 | **REA** (`rea-agents`) globally installed → `rea` on PATH | 6.5.0 |
-| 4 | **WABT** (wasm toolchain) and **jadx-headless-mcp** (Android Java engine) | WABT 1.0.42, jadx-headless-mcp 0.7.1 |
+| 4 | **WABT** (wasm toolchain), **jadx-headless-mcp** (Android Java engine) and **Wakaru** (JavaScript source recovery) | WABT 1.0.42, jadx-headless-mcp 0.7.1, Wakaru 1.14.0 |
 | 5 | **Apktool** launcher (Java wrapper + jar) | 2.12.1 (2.x line REA verified) |
 | 6 | **.NET SDK 8** + `ilspycmd` in `/opt/dotnet-tools` | ilspycmd 8.2.0.7535 |
-| 7 | Python venvs: **pwntools**, **unblob**, **mitmproxy** | pwntools 4.15.0 + pyelftools 0.33 + Unicorn 2.1.2; unblob 26.6.4; mitmproxy 12.2.3 |
+| 7 | Python venvs: **pwntools**, **unblob**, **mitmproxy** | pwntools 4.15.0 + pyelftools 0.33 + Unicorn 2.1.2 (pwntools excludes 2.1.3/2.1.4); unblob 26.6.4; mitmproxy 12.2.3 |
 | 8 | firmware/packet/signal tooling: `binwalk` (built from source in a Rust stage), `tshark`/`capinfos`, `sigrok-cli` + `libsigrokdecode`, `adb`, `e2fsprogs`, `sleuthkit`, `squashfs-tools`, `mtools`, `dtc` | binwalk 3.1.0, TShark 4.2.2, sigrok-cli 0.7.2 |
 | 9 | **chromium-family browser**: Google Chrome stable + Playwright Chromium (in `/opt/ms-playwright`) | chrome stable, playwright-core 1.58.2's pinned build |
 | 10 | **pwndbg** + its venv (for `--debugger-context` on core files) | pwndbg 2026.09.15, git `55596aa` |
 | 11 | optional **wine** + cross toolchains (aarch64, arm, mips/mipsel, riscv64, powerpc, mingw-w64) | Ubuntu 24.04 |
-| 12 | **uv** and **supergateway** (stdio↔Streamable HTTP MCP bridge) | uv 0.13.0, supergateway 4.1.0 |
+| 12 | **uv** and **supergateway** (stdio↔Streamable HTTP MCP bridge) | uv 0.13.1, supergateway 4.2.0 |
 | 13 | non-root user `rea` (uid/gid 1000), writable dirs, `ilspycmd`, entrypoint, healthcheck, verification harness, IDA templates | - |
 | **17a** | **Ghidra** + native decompiler for `linux_x86_64` (JDK 21 is layer 1 and lives in every image) — `REA_ENGINE=all\|ghidra` | Ghidra 12.1.4 |
 | **17b** | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime — `REA_ENGINE=all\|hopper` | Hopper 6.4.2 Linux |
@@ -55,6 +55,7 @@ Always set (engine-independent `ENV`):
 JAVA_HOME
 REA_PWNTOOLS_PYTHON, REA_PWNDBG_GDB, REA_PWNDBG_GDBINIT, REA_PWNDBG_VENV_PATH
 REA_WABT_BIN_DIRECTORY, REA_JADX_MCP_JAR, REA_APKTOOL_COMMAND, REA_ADB_PATH
+REA_WAKARU_COMMAND (JavaScript source recovery; needs util-linux prlimit)
 REA_BINWALK_COMMAND, REA_UNBLOB_COMMAND, REA_TSHARK_COMMAND, REA_CAPINFOS_COMMAND
 REA_SIGROK_COMMAND, REA_MITMDUMP_COMMAND, REA_ILSPY_CMD_PATH
 REA_BROWSER_NO_SANDBOX, PLAYWRIGHT_BROWSERS_PATH, REA_MCP_INPUT_SCHEMA_PROFILE
@@ -88,6 +89,7 @@ harness all read `/usr/local/share/rea/engine` to decide which checks apply.
 /opt/venvs/{pwntools,unblob,mitmproxy}
 /opt/pwndbg                 pwndbg checkout + .venv
 /opt/wabt/bin               wasm2wat, wasm-objdump, wasm-validate
+/opt/wakaru/wakaru          Wakaru 1.14.0, REA's JS recovery engine (REA_WAKARU_COMMAND)
 /opt/jadx/<jar>             jadx-headless-mcp 0.7.1 (REA_JADX_MCP_JAR)
 /opt/dotnet-tools/ilspycmd
 /opt/ms-playwright          Playwright Chromium build

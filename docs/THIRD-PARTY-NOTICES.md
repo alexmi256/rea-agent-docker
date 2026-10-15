@@ -15,6 +15,7 @@ keeps its own licence and terms. That installed set is:
 | Qt6 runtime (Hopper's dependency) | LGPL-3.0 |
 | Hopper (Linux demo package) | commercial; the **public demo** build is redistributed here exactly as downloaded from the vendor |
 | WABT | Apache-2.0 |
+| Wakaru | Apache-2.0 |
 | Apktool | Apache-2.0 |
 | jadx-headless-mcp | Apache-2.0 |
 | .NET SDK 8 | MIT |

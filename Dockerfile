@@ -35,11 +35,11 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # --- pinned upstream versions ------------------------------------------------
 ARG REA_VERSION=6.5.0
-ARG NODE_VERSION=24.21.0
+ARG NODE_VERSION=24.22.0
 # REA declares frida as an optional dependency (JS instrumentation). npm 11
 # blocks package install scripts by default, so frida's native binding is
 # installed explicitly with --allow-scripts and linked into REA's tree.
-ARG FRIDA_VERSION=17.23.2
+ARG FRIDA_VERSION=17.23.3
 ARG GHIDRA_VERSION=12.1.4
 ARG GHIDRA_ZIP=ghidra_12.1.4_PUBLIC_20260921.zip
 ARG GHIDRA_SHA256=
@@ -62,8 +62,20 @@ ARG PWNDBG_TAG=2026.09.15
 ARG PWNDBG_COMMIT=55596aa676a2756efb8d67034f31675170eabe48
 ARG PWTOOLS_VERSION=4.15.0
 ARG PYELFTOOLS_VERSION=0.33
+# Held at 2.1.2 by pwntools 4.15.0, which declares `unicorn !=2.1.3, !=2.1.4,
+# >=2.0.1`: pip's resolver refuses 2.1.4 outright (ResolutionImpossible), so the
+# newer unicorn is not installable next to the pwntools build REA admits. Unicorn
+# is not REA-admitted either, so pwntools' own constraint is the binding one.
 ARG UNICORN_VERSION=2.1.2
 ARG ILSPYCMD_VERSION=8.2.0.7535
+# Wakaru - REA's caller-supplied JavaScript source-recovery engine. Accepted range
+# ^1.13.0, verified against 1.14.0 (src/javascript/recovery/WakaruRelease.ts), and
+# REA fingerprints the executed binary, so the digest below is REA's own audited
+# build of the official release asset - not a value we invented. The npm package
+# would give the same bytes via @wakaru/cli-linux-x64, but REA wants the platform
+# binary, never the Node shim in node_modules/.bin.
+ARG WAKARU_VERSION=1.14.0
+ARG WAKARU_LINUX_X64_SHA256=664fa06782a61eda7ed15885134b52525fd565dd77607e642062ceb6cd927c38
 ARG CHROME_DEB_URL=https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 
 # --- engine selection --------------------------------------------------------
@@ -142,8 +154,9 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
     cd /var/cache/rea-dl; \
     file="node-v${NODE_VERSION}-linux-x64.tar.xz"; \
     [ -f "$file" ] || curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/${file}"; \
-    [ -f SHASUMS256.txt ] || curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
-    grep " ${file}\$" SHASUMS256.txt | sha256sum -c -; \
+    shasums="SHASUMS256-${NODE_VERSION}.txt"; \
+    [ -f "$shasums" ] || curl -fsSLo "$shasums" "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
+    grep " ${file}\$" "$shasums" | sha256sum -c -; \
     tar -xJf "$file" -C /usr/local --strip-components=1 --no-same-owner; \
     node --version; npm --version
 
@@ -207,6 +220,33 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
       "https://github.com/1013503897/jadx-headless-mcp/releases/download/v${JADX_MCP_VERSION}/${jar}"; \
     install -m 0644 "$jar" "/opt/jadx/${jar}"; \
     ls -l "/opt/jadx/${jar}"
+
+# =============================================================================
+# 7b. Wakaru 1.14.0 (REA's JavaScript source-recovery engine)
+# =============================================================================
+# REA advertises `recover_javascript_sources` but installs nothing for it: it
+# refuses the capability unless REA_WAKARU_COMMAND is an ABSOLUTE path to a
+# platform binary (accepted range ^1.13.0, parser verified with 1.14.0) and
+# util-linux prlimit is present. Hence the official release asset rather than the
+# npm package - npm yields identical bytes at @wakaru/cli-linux-x64, but its
+# node_modules/.bin entry is a Node shim, and REA resolves and fingerprints the
+# executable itself. The digest below is REA's own audited value for this asset,
+# so the build fails if the bytes ever differ; the banner is asserted in the
+# exact form REA parses (`wakaru <semver>`).
+ENV REA_WAKARU_COMMAND=/opt/wakaru/wakaru
+RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
+    set -eux; \
+    cd /var/cache/rea-dl; \
+    asset="wakaru-linux-x64.tar.gz"; \
+    tarball="wakaru-${WAKARU_VERSION}-linux-x64.tar.gz"; \
+    [ -f "$tarball" ] || curl -fsSLo "$tarball" \
+      "https://github.com/pionxzh/wakaru/releases/download/v${WAKARU_VERSION}/${asset}"; \
+    mkdir -p /opt/wakaru; \
+    tar -xzf "$tarball" -C /opt/wakaru wakaru; \
+    chmod 0755 /opt/wakaru/wakaru; \
+    echo "${WAKARU_LINUX_X64_SHA256}  /opt/wakaru/wakaru" | sha256sum -c -; \
+    "$REA_WAKARU_COMMAND" --version; \
+    test -f /usr/bin/prlimit && test -x /usr/bin/prlimit
 
 # =============================================================================
 # 8. Apktool 2.x (REA verified against 2.7.0; 3.x changes output layout)
@@ -379,8 +419,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 #     servers) and supergateway (stdio <-> Streamable HTTP bridge so the
 #     container's MCP surface can be published on a port).
 # =============================================================================
-ARG UV_VERSION=0.13.0
-ARG SUPERGATEWAY_VERSION=4.1.0
+ARG UV_VERSION=0.13.1
+ARG SUPERGATEWAY_VERSION=4.2.0
 ENV UV_INSTALL_DIR=/usr/local/bin \
     UV_NO_MODIFY_PATH=1 \
     UV_TOOL_BIN_DIR=/usr/local/bin \
