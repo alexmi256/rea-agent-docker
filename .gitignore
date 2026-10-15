@@ -22,3 +22,7 @@ vendor/hopper-state/
 # misc
 .env
 *.log
+
+# Local reverse-engineering scratch (analysis notes, keygen/verifier scripts,
+# unpacked targets). Not part of the image build; never publish it.
+ctf/
