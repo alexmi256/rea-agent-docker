@@ -27,14 +27,16 @@ name: rea-agent
 
 # --- shared build arguments --------------------------------------------------
 x-build-args: &build-args
-  REA_VERSION: ${REA_VERSION:-6.5.0}
-  NODE_VERSION: ${NODE_VERSION:-24.21.0}
+  REA_VERSION: ${REA_VERSION:-6.7.0}
+  NODE_VERSION: ${NODE_VERSION:-24.22.0}
   GHIDRA_VERSION: ${GHIDRA_VERSION:-12.1.4}
   GHIDRA_ZIP: ${GHIDRA_ZIP:-ghidra_12.1.4_PUBLIC_20260921.zip}
   GHIDRA_SHA256: ${GHIDRA_SHA256:-}
   HOPPER_DEB_URL: ${HOPPER_DEB_URL:-}
-  HOPPER_DEB_SHA1: ${HOPPER_DEB_SHA1:-e4f79dff602648a8ff4a88b773875b6bfac0dc65}
-  HOPPER_DEB_BYTES: ${HOPPER_DEB_BYTES:-35755772}
+  HOPPER_DEMO_VERSION: ${HOPPER_DEMO_VERSION:-6.6.0}
+  HOPPER_DEB_SHA1: ${HOPPER_DEB_SHA1:-575efccfd1ab3565399d04ef420b81483b631864}
+  HOPPER_DEB_BYTES: ${HOPPER_DEB_BYTES:-35748722}
+  HOPPER_LAUNCHER_SHA256: ${HOPPER_LAUNCHER_SHA256:-b2271008fb82bf14cfae5c3644cdde2b11fc6804bd7c99d67032ec1b1942d53c}
   INSTALL_CHROME: ${INSTALL_CHROME:-1}
   INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-1}
   INSTALL_PWNDBG: ${INSTALL_PWNDBG:-1}
@@ -109,7 +111,7 @@ services:
       args:
         <<: *build-args
         REA_ENGINE: all
-    image: ${REA_IMAGE:-ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64}
+    image: ${REA_IMAGE:-ghcr.io/alexmi256/rea-agent:6.7.0-linux-amd64}
     container_name: ${REA_CONTAINER_NAME:-rea-agent}
     platform: linux/amd64
     init: true
@@ -158,7 +160,7 @@ services:
       args:
         <<: *build-args
         REA_ENGINE: ghidra
-    image: ${REA_GHIDRA_IMAGE:-ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64}
+    image: ${REA_GHIDRA_IMAGE:-ghcr.io/alexmi256/rea-agent-ghidra:6.7.0-linux-amd64}
     container_name: ${REA_GHIDRA_CONTAINER_NAME:-rea-agent-ghidra}
     profiles: ["ghidra"]
     platform: linux/amd64
@@ -198,7 +200,7 @@ services:
       args:
         <<: *build-args
         REA_ENGINE: hopper
-    image: ${REA_HOPPER_IMAGE:-ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64}
+    image: ${REA_HOPPER_IMAGE:-ghcr.io/alexmi256/rea-agent-hopper:6.7.0-linux-amd64}
     container_name: ${REA_HOPPER_CONTAINER_NAME:-rea-agent-hopper}
     profiles: ["hopper"]
     platform: linux/amd64
@@ -238,7 +240,7 @@ services:
       args:
         <<: *build-args
         REA_ENGINE: ida
-    image: ${REA_IDA_IMAGE:-ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64}
+    image: ${REA_IDA_IMAGE:-ghcr.io/alexmi256/rea-agent-ida:6.7.0-linux-amd64}
     container_name: ${REA_IDA_CONTAINER_NAME:-rea-agent-ida}
     profiles: ["ida"]
     platform: linux/amd64

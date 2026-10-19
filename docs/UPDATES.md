@@ -59,7 +59,7 @@ REA re-derives the expectations instead of relying on this document's memory.
 
 | which reference governs | components |
 | --- | --- |
-| **REA admits (exact)** | Ghidra, Hopper package + launcher digest, JDK major, binwalk, unblob, WABT, TShark, sigrok-cli, jadx-headless-mcp, pwntools, Wakaru |
+| **REA admits (exact)** | Ghidra, Hopper package + launcher digest (read from the vendor's signed feed), JDK major, binwalk, unblob, WABT, TShark, sigrok-cli, jadx-headless-mcp, pwntools, Wakaru |
 | **REA floor only** | apktool (≥ 2.7.0 — we hold 2.x deliberately: 3.x changes the output layout) |
 | **no REA constraint** | ilspycmd (only has to be runnable), mitmproxy, pyelftools, unicorn, uv, supergateway, frida, playwright, Chrome, .NET, adb |
 | **npm/GitHub latest** | rea-agents itself, Node.js (within REA's `engines` range), GitHub Actions majors |
@@ -124,6 +124,11 @@ must contain.
   must satisfy it, or REA refuses to run at all;
 * the release's admitted engine builds (**the checker's `REA admits` column now
   changes to match the new release** — that is the point of reading it live);
+* whether an admission **moved**: the Ghidra policy file was renamed
+  (`GhidraInstallationPolicy.ts` → `GhidraReleasePolicy.ts`) and Hopper left the
+  source for the vendor's signed feed in the 6.6.x line. A stale path or an
+  empty admission shows up as a row that goes quiet, so check that each engine
+  row still shows the version REA expects rather than merely `ok`;
 * whether the release adds or renames tool families. REA's docs and `main` run
   ahead of the published package, so a family in the repo may not exist in the
   package you install, and vice versa. The harness reports absent families as
@@ -188,22 +193,33 @@ The JDK matters too: `SUPPORTED_GHIDRA_JAVA_MAJOR` (21 today) is the major Ghidr
 declares bounds for. We install `openjdk-21-jdk-headless` from apt, so a Java
 *patch* needs nothing but a rebuild.
 
-### Hopper (a digest, not a version)
+### Hopper (a signed feed, not a version)
 
-The gate is the **launcher's SHA-256**, and the package is pinned by **SHA-1 and
-byte length**:
+Since REA 6.6.0 the gate is no longer a fixed allowlist: REA authenticates the
+installed launcher against the vendor's **publisher-signed release feed**, and the
+feed only ever lists its **current** release. So the package is pinned by version
+*and* by the feed's own row:
 
 ```
-Dockerfile: HOPPER_DEB_SHA1 / HOPPER_DEB_BYTES / HOPPER_DEB_URL (empty = derived)
-REA source: src/application/LinuxHopper.ts → SUPPORTED_RELEASES (deb sha1 + bytes)
-                                         → SUPPORTED_HOPPER_SHA256 (launcher digests)
+Dockerfile:  HOPPER_DEMO_VERSION / HOPPER_DEB_SHA1 / HOPPER_DEB_BYTES
+             HOPPER_DEB_URL (empty = derive from the feed)
+             HOPPER_LAUNCHER_SHA256  (the feed's main_exe_hash)
+             HOPPER_RELEASES_URL / HOPPER_PUBLIC_KEY_URL
+REA source:  src/application/HopperReleaseFeed.ts   → the feed schema
+             src/application/LinuxHopperPublisher.ts → verification + evidence cache
 ```
 
-The checker prints how many launcher digests REA admits and whether our package
-matches `SUPPORTED_RELEASES` exactly. **A licensed Hopper build can legitimately
-report drift while working** — that is a vendor-licence difference, not a broken
-install. Never download a licensed build: Hopper ships as the vendor's **demo
-package** only (see `docs/BYO-LICENSES.md`).
+The build reads the feed and **fails** if the pinned values no longer match it,
+verifies the downloaded package (byte length + SHA-1) and the installed launcher
+(before install: the feed's `main_exe_hash`), then bakes the signed evidence
+(`release.json` + `public-key.asc` + the package bytes) into
+`/home/rea/.cache/rea/hopper-releases/<main_exe_hash>/` so REA admits the build
+without network access. `make check-updates` re-derives every one of those values
+from the same feed, so the pin and the check cannot drift apart.
+
+A licensed build may legitimately report drift while working — that is a
+vendor-licence difference, not a broken install. Never download a licensed build:
+Hopper ships as the vendor's **demo package** only (see `docs/BYO-LICENSES.md`).
 
 ### IDA / JEB (never installed)
 
@@ -294,6 +310,7 @@ with the reason, so the row is expected rather than surprising.
 | --- | --- |
 | IDA / JEB | licensable vendor software: bring-your-own by design, never downloaded |
 | Hopper licensed builds | same; only the vendor demo package is installed |
+| **Kuna** (caller-supplied static-analysis provider, REA 6.6.0+) | REA expects a *caller-installed* Kuna and does not ship one; the image is the caller's environment, so an uninstalled Kuna is `provider_missing` by design, exactly like IDA |
 | Apple composite providers (plist etc.) | provider-scoped, not a host capability |
 
 Wakaru was the first real `MISSING` row produced by the checker — REA 6.5.0
@@ -380,7 +397,12 @@ Everything lives in `scripts/check-updates.py`:
 * **a new REA admission pattern** → add a regex to the `patterns` dict in
   `scrape_rea` (keys match the checker's own component keys) and point the row at
   it via `admissions.tool("<key>")`;
-* **a new REA source file** → add it to `REA_SOURCES`;
+* **a new REA source file** → add it to `REA_SOURCES` (REA moves these: the
+  Ghidra policy moved from `GhidraInstallationPolicy.ts` to
+  `GhidraReleasePolicy.ts` in 6.6.x, and Hopper left the source entirely);
+* **an admission that lives outside REA's source** → `scrape_rea` already does
+  this for Hopper: `admissions.hopper_feed` is the vendor's signed release feed
+  (`HOPPER_FEED_URL`), which is what REA itself now validates against;
 * **a new local consistency rule** → add it to the coherence row in `check_rea`
   (that is where "the release string must agree everywhere" lives).
 
@@ -405,9 +427,16 @@ passes when it cannot see upstream is worse than no check.
   current stable") are the exception, not the rule.
 * **`config_drift` from `rea doctor` is not an install failure.** It usually
   means the engine build is newer than the admitted one.
-* **A Hopper version number proves nothing** — the gate is the launcher digest.
+* **A Hopper version number proves nothing** — the gate is the launcher digest
+  the vendor's signed feed authenticates for the *current* release, so re-pinning
+  the package is only half the bump: `HOPPER_LAUNCHER_SHA256` and the retained
+  evidence move with it.
+* **The Hopper feed only ever offers its current release.** The pinned demo's
+  download URL 404s once the vendor ships the next one, so a feed move has to be
+  fixed by bumping the pins, not by pinning the old URL harder; `make
+  check-updates` reports it as `BEHIND-REA` the moment it happens.
 * **"Newer" and "admitted" can point in opposite directions.** jadx-headless-mcp
-  is the live example: we pin 0.7.1 because REA 6.5.0 admits 0.7.1, while npm
+  is the live example: we pin 0.7.1 because REA 6.7.0 admits 0.7.1, while npm
   still only publishes 0.7.0. The checker reports that as fine, and it is.
 * **GHCR tags are per image.** There is no repo-wide `latest`; bumps add tags and
   leave old ones in place.

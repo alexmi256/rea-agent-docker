@@ -3,7 +3,7 @@
 Commands:
 
 ```bash
-scripts/verify.sh --image rea-agent-ghidra:6.5.0-linux-amd64   # one engine image
+scripts/verify.sh --image rea-agent-ghidra:6.7.0-linux-amd64   # one engine image
 scripts/verify-all-engines.sh                                  # all four, one table
 make verify ENGINE=hopper                                      # same, via make
 ```
@@ -26,7 +26,7 @@ single-engine image gives up.
 | Runtime | Node 24.x, REA `--version`, `rea providers`, provider discovery for the engines present |
 | Engine profile | `/usr/local/share/rea/engine` marker, `engine.env` content, the `rea` wrapper that injects it, and that the container **healthcheck** calls this image healthy (shallow and deep) |
 | Ghidra (images that carry it) | `doctor --provider ghidra` healthy; analysis of x86-64, AArch64, ARMv7, MIPS32 (BE + LE), RISC-V64, PowerPC and a Windows PE32+; `function`/`decompile`/`search`/`instructions` on the x86-64 fixture; a refusal of any ELF machine the release does not admit is reported as SKIP-with-reason, not failure |
-| Hopper (images that carry it) | `doctor --provider hopper` healthy; headless demo-mode analysis, decompilation and string search of the x86-64 fixture (private Xvfb display) |
+| Hopper (images that carry it) | `doctor --provider hopper` healthy (the launcher digest is the one the vendor's signed release feed authenticates); headless demo-mode analysis, decompilation and string search of the x86-64 fixture (private Xvfb display) |
 | Static | `inspect-binary-layout` (pwntools 4.15.0), `inspect-sqlite-database`-family routing, `inspect-managed-artifact`/`-members` (.NET + a real ilspycmd decompile), `inspect-evm-interface`, `analyze-javascript-application`, `import-reference-source`, zip-bundle `inspect-artifact`/`extract-artifact`, application-directory `analyze` |
 | Capture | `inspect-packet-capture` (tshark 4.2.2), signal decoding (sigrok-cli 0.7.2), `inspect-firmware-regions` (binwalk 3.1.0) + `extract-firmware` (unblob 26.6.4), web-network-capture for HAR and for a **live mitmdump 12.2.3 capture**, Chrome CDP target/page/screenshot, Playwright launch→click→DOM, PTY `capture-process` |
 | Clients | Frida device inventory, adb client/devices, Apktool launcher, JADX engine JAR, IDA registration templates, JEB endpoint, Hopper state directory |
@@ -63,8 +63,10 @@ image after the engine split):
   (`ghidra-native_decompiler`: "elf x86_64, which matches linux/x64";
   `ghidra-java` accepts JDK 21 64-bit).
 * `rea doctor --provider hopper --json` → `healthy: true` on `all` and `hopper`;
-  `hopper-version` healthy (launcher SHA-256 `0294ced1…` is in REA's
-  `SUPPORTED_HOPPER_SHA256`), `hopper-demo-runtime` healthy with `strategy=direct`.
+  `hopper-version` healthy (the launcher SHA-256 is the one the vendor's signed
+  release feed authenticates - `b2271008…` for the shipped Hopper 6.6.0 demo, and
+  the image retains that signed evidence so the check also holds offline),
+  `hopper-demo-runtime` healthy with `strategy=direct`.
 * Engine injection works with **no environment at all**: `docker run --rm
   <image> rea doctor --provider <engine>` is healthy, because the `rea` wrapper
   reads `engine.env`. Verified per image, together with `env | grep -c
@@ -74,7 +76,7 @@ image after the engine split):
   `ida` → shallow `healthy`, deep reports
   `unhealthy: engine=ida but REA_IDA_MCP_CONFIG is not set`, which is the correct
   answer for an unconfigured, engine-less image.
-* `rea mcp` answers MCP `initialize` (server `rea 6.5.0`, protocol
+* `rea mcp` answers MCP `initialize` (server `rea 6.7.0`, protocol
   `2025-06-18`, capabilities tools/completions/prompts) and advertises
   **207 tools** on every image (the catalog does not depend on the engine).
 * `ilspycmd 8.2.0.7535` runs (net6.0 app; the image sets
@@ -114,6 +116,29 @@ Their tooling (WABT 1.0.42, Node's built-in SQLite, TShark, sigrok-cli 0.7.2,
 frida 17.23.2) was already in the image, so no dependency changed for this —
 only `REA_VERSION`.
 
+## Target admission on REA 6.7.0
+
+* **Hopper is admitted through a signed feed, not a fixed allowlist.** REA 6.6.0
+  replaced `SUPPORTED_RELEASES`/`SUPPORTED_HOPPER_SHA256` with the vendor's
+  publisher-signed release feed, whose only Linux entry is the *current* demo
+  (Hopper 6.6.0, launcher `b2271008…`). A build REA admitted under 6.5.0 is
+  refused now, so the image ships the feed's release; the harness asserts the
+  launcher digest against the build-time marker
+  (`/usr/local/share/rea/hopper-launcher.sha256`) and the operation-level checks
+  confirm REA reports `hopper launcher-sha256:b2271008…` in the analysis profile.
+  The image also retains the signed evidence, so the same checks hold without
+  network access; a *licensed* Hopper goes in through `vendor/` and is admitted by
+  its own publisher evidence, which is why that assertion SKIPs rather than fails
+  for it.
+* **The Ghidra policy file was renamed.** `SUPPORTED_GHIDRA_VERSION` moved from
+  `src/ghidra/GhidraInstallationPolicy.ts` to `src/ghidra/GhidraReleasePolicy.ts`
+  in the 6.6.x line. The admitted build is still 12.1.4 and the accepted release
+  line is 12.1.x; the update checker had to be repointed, or the Ghidra row would
+  have gone quiet instead of failing.
+* **Kuna is a new caller-supplied provider** (REA 6.6.0+). Like IDA and JEB it is
+  never installed by the image, so it reports `provider_missing` by design and is
+  recorded as an accepted gap in `docs/UPDATES.md` rather than as a `MISSING` row.
+
 ## Target admission on REA 6.5.0
 
 * **RISC-V64 and PowerPC ELF are now admitted.** Through 6.4.0 the harness
@@ -142,6 +167,7 @@ only `REA_VERSION`.
 | **CI publish run (all four, REA 6.4.0)** | run [38481777484](https://github.com/alexmi256/rea-agent-docker/actions/runs/38481777484) — every engine image built on a hosted runner (ida 10m0s, hopper 9m10s, ghidra 11m42s, all-engines longest), quick harness green on each, then published to `ghcr.io/alexmi256/rea-agent[-ghidra\|-hopper\|-ida]` with tags `6.4.0-linux-amd64` and `latest`. Public access verified independently of the CI log: `docker manifest inspect` on all four tags succeeds **anonymously** (no `ghcr.io` credentials on the machine doing the check). |
 | **Local per-engine sweep, REA 6.5.0 (this bump)** | all 107/0/3 · ghidra 95/0/8 · hopper 88/0/7 · ida 80/0/11 — **0 failures on all four**, exit 0 on every image. The first pass caught one harness defect (`sigrok decoder inventory` asserted `uart` appeared in the decoder catalog's default 50-of-111 page); fixed by searching with `inspect-signal-decoders --query uart` and re-run. Also newly green relative to 6.4.0: sqlite, wasm, go-binary, pcap ×3, signal ×2, frida, and the RISC-V64/PowerPC ELF searches. |
 | **Local per-engine sweep, dependency round (2026-10-15)** | all **120/0/3** · ghidra **108/0/8** · hopper **101/0/7** · ida **93/0/11** — 0 failures on all four, exit 0 on every image; full log in [`docs/verify-engines.txt`](verify-engines.txt). This is the round that bumped Node to 24.22.0, frida to 17.23.3, uv to 0.13.1, supergateway to 4.2.0 and added **Wakaru 1.14.0**, so the count includes 13 new checks: five assert REA's admission rules for the Wakaru binary (absolute path, readable+executable, the `wakaru <semver>` banner, the audited SHA-256, util-linux prlimit) and eight run the operation itself — a minified bundle fixture is recovered, the Evidence is asserted on schema fields (provider `wakaru`, `status: complete`, `failed: 0`, module `decompiled`, and the fingerprinted digest **`664fa067…` proving REA ran the audited asset**), the published module file is checked, and the recovered tree is then analysed with `analyze-javascript-application`. |
+| **Local per-engine sweep, REA 6.7.0 (this bump)** | all **120/0/3** · ghidra **108/0/8** · hopper **101/0/7** · ida **93/0/11** — 0 failures on all four, exit 0 on every image; runs `20261019T014730Z` / `20261019T015922Z` / `20261019T021101Z` / `20261019T021249Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). Counts are **identical to the previous round** on every image, which is the expected result: 6.6.0/6.7.0 added no tool family and removed none. The bump's real work was a change of gate — Hopper moved from a fixed launcher-digest allowlist to the vendor's signed release feed (so the pinned 6.4.2 build is refused outright and the image now ships 6.6.0 plus its retained evidence), the Ghidra policy source was renamed, and both had to be re-derived in `scripts/check-updates.py`, which is back to `0 actionable / 0 pending / 0 unknown`. frida moved to 17.24.1. |
 | **Build failures this round caught** | Two, both real and both fixed rather than worked around: the Node layer died with `sha256sum: no properly formatted checksum lines found` because `/var/cache/rea-dl` held the *previous* version's `SHASUMS256.txt` under a version-less name (the cached filename is now version-qualified, and the stale file was deliberately left in place to prove the fix, not the cache clean); and `pip` refused `unicorn==2.1.4` with `ResolutionImpossible` because pwntools 4.15.0 declares `unicorn !=2.1.3, !=2.1.4` — so unicorn stays at 2.1.2 and the checker now reports it as `held on 2.1.2: <reason>` instead of as an available update. Neither reached GHCR: the publish step runs only after verification. |
 
 The committed summary of the last full single-image run is in

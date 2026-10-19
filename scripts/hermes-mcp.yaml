@@ -62,7 +62,7 @@ mcp_servers:
 #      - /path/to/rea-agent-docker/targets:/targets:ro
 #      - -w
 #      - /work
-#      - rea-agent-ghidra:6.5.0-linux-amd64
+#      - rea-agent-ghidra:6.7.0-linux-amd64
 #      - rea
 #      - mcp
 #    timeout: 1800
@@ -102,5 +102,5 @@ mcp_servers:
 #
 # Do NOT use `npx skills add morluto/rea --skill reverse-engineer-anything`: it
 # installs repository main, which tracks unreleased work (it happens to be skill
-# v42 - the same as 6.5.0 - right now, but it is unversioned and drifts).
+# v42 - the same as 6.7.0 - right now, but it is unversioned and drifts).
 # See docs/HERMES-MCP.md section 4 for the verification step.

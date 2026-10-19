@@ -31,34 +31,42 @@ REA's use (REA drives the Linux demo headlessly on a private Xvfb display and
 chooses demo mode itself). Demo limits: no save/export, no debugger backend,
 30-minute sessions.
 
-**Version pin matters.** REA does not just check that Hopper exists: it hashes
-the launcher binary and compares it against the launcher digests of the one
-Linux package it was validated with per package family
-(`SUPPORTED_RELEASES`/`SUPPORTED_HOPPER_SHA256` in
-`src/application/LinuxHopper.ts`). For REA 6.5.0 that is **Hopper 6.4.2
-(Linux demo)**. A different build makes `rea doctor --provider hopper --json`
-report `hopper-version` as `config_drift`.
+**Version pin matters.** REA 6.6.0 replaced the fixed launcher-digest allowlist
+(`SUPPORTED_RELEASES`/`SUPPORTED_HOPPER_SHA256`, which lived in
+`src/application/LinuxHopper.ts` until 6.5.0) with the vendor's
+**publisher-signed release feed** (`src/application/HopperReleaseFeed.ts`,
+`src/application/LinuxHopperPublisher.ts`). REA validates the installed launcher
+against that feed's authenticated `main_exe_hash`, and the feed only ever lists
+its **current** release - so a build REA admitted last month is refused today. A
+licensed build is admitted through its own retained publisher evidence instead.
+Anything else makes `rea doctor --provider hopper --json` report `hopper-version`
+as `config_drift`.
 
-This image therefore ships the pinned build by default, and derives the
-filename from the installed REA package at build time rather than hardcoding
-it:
+This image therefore ships the feed's current release by default. The build reads
+the feed, refuses to proceed when it no longer matches the pinned
+`HOPPER_DEMO_VERSION`/`HOPPER_DEB_SHA1`/`HOPPER_DEB_BYTES`/`HOPPER_LAUNCHER_SHA256`,
+and bakes the signed evidence (feed row + vendor public key + the package bytes)
+into REA's own cache path so REA can admit the launcher offline:
 
-```bash
-# inside the image - this is the build's own step; a host shell has no REA:
-docker run --rm --entrypoint sh rea-agent-hopper:6.5.0-linux-amd64 -c \
-  'grep -rohE "Hopper-[0-9.]+-Linux-demo[.]deb" "$(npm root -g)/rea-agents/dist" | head -1'
+```
+/home/rea/.cache/rea/hopper-releases/<main_exe_hash>/{release.json,public-key.asc,archive}
 ```
 
-The launcher digest is printed by the build log
-(`Hopper launcher sha256: 0294ced1…`) and is in REA's supported set.
+The build log prints what it verified:
+
+```
+vendor feed offers Linux Hopper 6.6.0 (Hopper-6.6.0-Linux-demo.deb, 35748722 bytes)
+Hopper launcher sha256: b2271008…
+retained publisher-signed Hopper evidence: /home/rea/.cache/rea/hopper-releases/b2271008…
+```
 
 ```bash
-# default (public demo 6.4.2 - the build REA 6.5.0 pins) - what compose does
+# default (public demo 6.6.0 - the build the vendor feed authenticates today)
 make build            # the all-engines image
 make build-hopper     # the Hopper-only image
 
 # licensed package: drop the DEB into vendor/ and rebuild
-cp ~/Downloads/Hopper-6.4.2-Linux.deb vendor/
+cp ~/Downloads/Hopper-6.6.0-Linux.deb vendor/
 scripts/build.sh --engine hopper        # or ENGINE=all / make build
 docker compose --profile hopper up -d rea-hopper
 docker compose exec rea-hopper rea doctor --provider hopper --json

@@ -1,31 +1,38 @@
 # Per-engine verification sweep (full harness, one run per engine image)
 #
 # Command: scripts/verify-all-engines.sh
-# Date:    2026-10-15T21:50:44Z
-# REA:     6.5.0 (rea-agents npm release; 207 MCP tools, matching the bundled skill)
+# Date:    2026-10-19T02:12:49Z (sweep started 2026-10-19T01:47:30Z)
+# REA:     6.7.0 (rea-agents npm release; 207 MCP tools, matching the bundled skill)
 # Images:  rea-agent / -ghidra / -hopper / -ida, linux/amd64, built by scripts/build-all.sh
 # Result:  0 failures on all four (every skip is conditional and listed below)
 #
-# This run covers the 2026-10-15 dependency round: Node 24.21.0 -> 24.22.0,
-# frida 17.23.2 -> 17.23.3, uv 0.13.0 -> 0.13.1, supergateway 4.1.0 -> 4.2.0, and
-# the addition of Wakaru 1.14.0 (REA's JavaScript source recovery engine, with 13
-# new checks: 5 for REA's admission rules on the binary, 8 for the recovery
-# operation itself and the analysis of what it recovers). Unicorn stays at 2.1.2
-# because pwntools 4.15.0 declares `unicorn !=2.1.3,!=2.1.4`.
+# This run covers the REA 6.7.0 bump. REA 6.6.0 replaced Hopper's fixed
+# launcher-digest allowlist with the vendor's publisher-signed release feed, so the
+# image now ships the feed's current Linux demo (Hopper 6.6.0, launcher
+# b2271008...) and retains the signed evidence REA verifies it against; the pinned
+# Hopper 6.4.2 build is no longer admitted at all. frida moved 17.23.3 -> 17.24.1.
+# The update checker was re-derived for the new release: its Ghidra source moved to
+# src/ghidra/GhidraReleasePolicy.ts and its Hopper admission now comes from the
+# vendor feed rather than REA's source, which no longer carries either table.
+# 
+# Counts are identical to the previous (2026-10-15) sweep on every engine image,
+# which is the expected result: no tool family was added, removed or renamed by
+# 6.6.0/6.7.0, and the catalog is still 207 MCP tools (bundled skill v42).
 #
 # NOTE: the `platform:` line in each run is redacted to 'Linux x86_64' - the
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 
 
+
 ==============================================================
-=== verifying engine: all  (ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64)
+=== verifying engine: all  (ghcr.io/alexmi256/rea-agent:6.7.0-linux-amd64)
 ==============================================================
-running harness in ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64 as 10000:10000
+running harness in ghcr.io/alexmi256/rea-agent:6.7.0-linux-amd64 as 10000:10000
 [rea-agent] loaded overrides from /etc/rea/rea.env
 [rea-agent] engine profile: all
-[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
-rea-agent verification  run=20261015T212528Z  out=/work/verify-reports/20261015T212528Z
+[rea-agent] ready: rea 6.7.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261019T014730Z  out=/work/verify-reports/20261019T014730Z
 
 == fixtures ==
 building C fixtures in /tmp/rea-verify/fixtures
@@ -84,7 +91,7 @@ fixtures ready in /tmp/rea-verify/fixtures
   PASS ghidra native decompiler (linux_x86_64)
   PASS hopper launcher executable
   PASS hopper shared libraries resolve (0 = none missing)
-  PASS hopper launcher digest is one REA accepts
+  PASS hopper launcher digest is the demo REA's feed admits
   PASS xvfb present
   PASS IDA mount point
   PASS IDA licence placement helpers
@@ -262,12 +269,12 @@ fixtures ready in /tmp/rea-verify/fixtures
 == MCP over Streamable HTTP (supergateway bridge) ==
   PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261015T212528Z
-date:      2026-10-15T21:37:16Z
-image:     ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64
+run:       20261019T014730Z
+date:      2026-10-19T01:59:20Z
+image:     ghcr.io/alexmi256/rea-agent:6.7.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.22.0
-rea:       6.5.0
+rea:       6.7.0
 passed:    120
 failed:    0
 skipped:   3
@@ -277,17 +284,17 @@ skipped checks:
   - ida doctor
   - jeb client
 
-report: /work/verify-reports/20261015T212528Z
+report: /work/verify-reports/20261019T014730Z
 passed=120 failed=0 skipped=3
 
 ==============================================================
-=== verifying engine: ghidra  (ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64)
+=== verifying engine: ghidra  (ghcr.io/alexmi256/rea-agent-ghidra:6.7.0-linux-amd64)
 ==============================================================
-running harness in ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64 as 10000:10000
+running harness in ghcr.io/alexmi256/rea-agent-ghidra:6.7.0-linux-amd64 as 10000:10000
 [rea-agent] loaded overrides from /etc/rea/rea.env
 [rea-agent] engine profile: ghidra
-[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
-rea-agent verification  run=20261015T213718Z  out=/work/verify-reports/20261015T213718Z
+[rea-agent] ready: rea 6.7.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261019T015922Z  out=/work/verify-reports/20261019T015922Z
 
 == fixtures ==
 building C fixtures in /tmp/rea-verify/fixtures
@@ -517,12 +524,12 @@ fixtures ready in /tmp/rea-verify/fixtures
 == MCP over Streamable HTTP (supergateway bridge) ==
   PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261015T213718Z
-date:      2026-10-15T21:48:57Z
-image:     ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64
+run:       20261019T015922Z
+date:      2026-10-19T02:10:59Z
+image:     ghcr.io/alexmi256/rea-agent-ghidra:6.7.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.22.0
-rea:       6.5.0
+rea:       6.7.0
 passed:    108
 failed:    0
 skipped:   8
@@ -537,17 +544,17 @@ skipped checks:
   - jeb client
   - hopper application-support dir
 
-report: /work/verify-reports/20261015T213718Z
+report: /work/verify-reports/20261019T015922Z
 passed=108 failed=0 skipped=8
 
 ==============================================================
-=== verifying engine: hopper  (ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64)
+=== verifying engine: hopper  (ghcr.io/alexmi256/rea-agent-hopper:6.7.0-linux-amd64)
 ==============================================================
-running harness in ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64 as 10000:10000
+running harness in ghcr.io/alexmi256/rea-agent-hopper:6.7.0-linux-amd64 as 10000:10000
 [rea-agent] loaded overrides from /etc/rea/rea.env
 [rea-agent] engine profile: hopper
-[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
-rea-agent verification  run=20261015T214859Z  out=/work/verify-reports/20261015T214859Z
+[rea-agent] ready: rea 6.7.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261019T021101Z  out=/work/verify-reports/20261019T021101Z
 
 == fixtures ==
 building C fixtures in /tmp/rea-verify/fixtures
@@ -579,7 +586,7 @@ building C fixtures in /tmp/rea-verify/fixtures
   dotnet:     0 Warning(s)
   dotnet:     0 Error(s)
   dotnet: 
-  dotnet: Time Elapsed 00:00:02.10
+  dotnet: Time Elapsed 00:00:02.13
   + dotnet-app/bin/Release/net8.0/VerifyLib.dll
 fixtures ready in /tmp/rea-verify/fixtures
 
@@ -605,7 +612,7 @@ fixtures ready in /tmp/rea-verify/fixtures
   SKIP ghidra installation - not in this image (engine: hopper)
   PASS hopper launcher executable
   PASS hopper shared libraries resolve (0 = none missing)
-  PASS hopper launcher digest is one REA accepts
+  PASS hopper launcher digest is the demo REA's feed admits
   PASS xvfb present
 
 == static analysis helpers ==
@@ -767,12 +774,12 @@ fixtures ready in /tmp/rea-verify/fixtures
 == MCP over Streamable HTTP (supergateway bridge) ==
   PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261015T214859Z
-date:      2026-10-15T21:50:42Z
-image:     ghcr.io/alexmi256/rea-agent-hopper:6.5.0-linux-amd64
+run:       20261019T021101Z
+date:      2026-10-19T02:12:47Z
+image:     ghcr.io/alexmi256/rea-agent-hopper:6.7.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.22.0
-rea:       6.5.0
+rea:       6.7.0
 passed:    101
 failed:    0
 skipped:   7
@@ -786,19 +793,19 @@ skipped checks:
   - IDADIR mount
   - jeb client
 
-report: /work/verify-reports/20261015T214859Z
+report: /work/verify-reports/20261019T021101Z
 passed=101 failed=0 skipped=7
 
 ==============================================================
-=== verifying engine: ida  (ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64)
+=== verifying engine: ida  (ghcr.io/alexmi256/rea-agent-ida:6.7.0-linux-amd64)
 ==============================================================
-running harness in ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64 as 10000:10000
+running harness in ghcr.io/alexmi256/rea-agent-ida:6.7.0-linux-amd64 as 10000:10000
 [rea-agent] loaded overrides from /etc/rea/rea.env
 [rea-agent] engine profile: ida
 [rea-agent] note: this image bundles no analysis engine. Provide IDA + a registration:
 [rea-agent] note:   /opt/rea/scripts/setup-ida-mcp.sh <idalib|official|sidecar|attached|native>
-[rea-agent] ready: rea 6.5.0 | node v24.22.0 | user rea
-rea-agent verification  run=20261015T215044Z  out=/work/verify-reports/20261015T215044Z
+[rea-agent] ready: rea 6.7.0 | node v24.22.0 | user rea
+rea-agent verification  run=20261019T021249Z  out=/work/verify-reports/20261019T021249Z
 
 == fixtures ==
 building C fixtures in /tmp/rea-verify/fixtures
@@ -830,7 +837,7 @@ building C fixtures in /tmp/rea-verify/fixtures
   dotnet:     0 Warning(s)
   dotnet:     0 Error(s)
   dotnet: 
-  dotnet: Time Elapsed 00:00:02.18
+  dotnet: Time Elapsed 00:00:02.09
   + dotnet-app/bin/Release/net8.0/VerifyLib.dll
 fixtures ready in /tmp/rea-verify/fixtures
 
@@ -1014,12 +1021,12 @@ fixtures ready in /tmp/rea-verify/fixtures
 == MCP over Streamable HTTP (supergateway bridge) ==
   PASS http bridge initialize (serverInfo over SSE)
 rea-agent verification
-run:       20261015T215044Z
-date:      2026-10-15T21:52:15Z
-image:     ghcr.io/alexmi256/rea-agent-ida:6.5.0-linux-amd64
+run:       20261019T021249Z
+date:      2026-10-19T02:14:18Z
+image:     ghcr.io/alexmi256/rea-agent-ida:6.7.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.22.0
-rea:       6.5.0
+rea:       6.7.0
 passed:    93
 failed:    0
 skipped:   11
@@ -1037,17 +1044,17 @@ skipped checks:
   - hopper application-support dir
   - mcp open_binary/analyze_function
 
-report: /work/verify-reports/20261015T215044Z
+report: /work/verify-reports/20261019T021249Z
 passed=93 failed=0 skipped=11
 
 ==============================================================
 === per-engine results
 ==============================================================
 ENGINE   COUNTS                                 EXIT      RUN
-all      passed=120 failed=0 skipped=3          exit=0    20261015T212528Z
-ghidra   passed=108 failed=0 skipped=8          exit=0    20261015T213718Z
-hopper   passed=101 failed=0 skipped=7          exit=0    20261015T214859Z
-ida      passed=93 failed=0 skipped=11          exit=0    20261015T215044Z
+all      passed=120 failed=0 skipped=3          exit=0    20261019T014730Z
+ghidra   passed=108 failed=0 skipped=8          exit=0    20261019T015922Z
+hopper   passed=101 failed=0 skipped=7          exit=0    20261019T021101Z
+ida      passed=93 failed=0 skipped=11          exit=0    20261019T021249Z
 
 all verified engine images passed
 EXIT=0

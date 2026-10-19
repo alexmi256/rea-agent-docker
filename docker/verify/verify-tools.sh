@@ -54,8 +54,19 @@ if engine_has hopper; then
     check "hopper launcher executable" "Hopper"            -- bash -c "ls -l \"$HOPPER_LAUNCHER_PATH\""
     check "hopper shared libraries resolve (0 = none missing)" "^0$" \
         -- bash -c "ldd \"$HOPPER_LAUNCHER_PATH\" | grep -c 'not found' || true"
-    check "hopper launcher digest is one REA accepts" "0294ced1|1339f9e5" \
-        -- bash -c "sha256sum \"$HOPPER_LAUNCHER_PATH\""
+    # REA 6.6.0+ admits a Linux Hopper by verifying the launcher against the
+    # publisher-signed vendor feed, not against a fixed allowlist. The public
+    # demo's digest is recorded at build time; a vendor/licensed package goes in
+    # through vendor/ instead and is admitted by signature, so the assertion is
+    # skipped rather than failed for it (docs/BYO-LICENSES.md).
+    admitted=/usr/local/share/rea/hopper-launcher.sha256
+    if [ -r "$admitted" ]; then
+        check "hopper launcher digest is the demo REA's feed admits" "$(cat "$admitted")" \
+            -- bash -c "sha256sum \"$HOPPER_LAUNCHER_PATH\""
+    else
+        _skip "hopper launcher digest" \
+            "vendor/licensed Hopper package: REA admits it by publisher signature, not by digest (docs/BYO-LICENSES.md)"
+    fi
     check "xvfb present"        "/usr/bin/Xvfb"            -- which Xvfb
 else
     _skip "hopper installation" "not in this image (engine: $(image_engine))"

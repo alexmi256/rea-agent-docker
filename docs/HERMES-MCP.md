@@ -71,7 +71,7 @@ Give it targets it can read: put samples in `./targets` (mounted read-only at
 
 ```bash
 # with the engine you built (REA_IMAGE/REA_ENGINE must match that image)
-REA_IMAGE=rea-agent-ghidra:6.5.0-linux-amd64 REA_ENGINE=ghidra \
+REA_IMAGE=rea-agent-ghidra:6.7.0-linux-amd64 REA_ENGINE=ghidra \
   docker compose -f docker-compose.yml -f compose.http.yml --profile ghidra up -d rea-mcp-http
 # or: make http-up ENGINE=ghidra
 
@@ -105,7 +105,7 @@ $ curl -sS -X POST http://127.0.0.1:8811/mcp \
     -d '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
 data: {"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true},
       "completions":{},"prompts":{"listChanged":true}},
-      "serverInfo":{"name":"rea","version":"6.5.0"},"instructions":"REA provides ..."}}
+      "serverInfo":{"name":"rea","version":"6.7.0"},"instructions":"REA provides ..."}}
 ```
 
 Notes for HTTP clients:
@@ -183,7 +183,7 @@ npx skills add morluto/rea --skill reverse-engineer-anything   # NOT version-mat
 
 This takes the skill from repository `main`, which tracks unreleased work. That
 is why the version-matched routes above are the default. Note that as of REA
-6.5.0 (npm release, skill v42) `main` and the release currently agree — but this
+6.7.0 (npm release, skill v42) `main` and the release currently agree — but this
 route is *unversioned*, so it starts to describe tools your server does not
 advertise the moment `main` moves ahead again. Use it only if you deliberately
 build from `main`.
@@ -196,7 +196,7 @@ Ask the image which skill revision it expects, then compare your installed copy:
 # jq ships inside the image, so run it there - nothing is needed on the client:
 docker exec rea-agent-ghidra sh -c 'rea doctor --format json 2>/dev/null | tail -1 \
   | jq -r ".identity | \"cli \(.cli_package_version) | skill v\(.expected_skill_version) | tools \(.catalog.counts.mcp_tools)\""'
-# cli 6.5.0 | skill v42 | tools 207
+# cli 6.7.0 | skill v42 | tools 207
 
 grep -E '^  (version|tool_count):' "$skills_root/reverse-engineer-anything/SKILL.md"
 #   version: "42"

@@ -77,15 +77,24 @@ Keep at least ~2× the largest target's expected working set free on the host;
 
 **`rea doctor --provider hopper --json` is unhealthy (`hopper-version`
 `config_drift`)**
-REA matches the Hopper *launcher's SHA-256* against the single Linux build it
-validated per package family. REA 6.5.0 pins Hopper 6.4.2 (demo), which is what
-this image installs; a licensed or hand-built Hopper will report drift even
-though it may analyse fine. To check which build your REA expects:
+Since REA 6.6.0 the gate is not a fixed digest allowlist but the vendor's
+**publisher-signed release feed**: REA authenticates the installed launcher
+against the feed's current `main_exe_hash`, and the feed only offers its current
+release. This image installs that release (Hopper 6.6.0) and retains the signed
+evidence, so it is admitted offline; a licensed or hand-built Hopper reports drift
+even though it may analyse fine. To see which build your REA expects:
 
 ```bash
 docker run --rm ghcr.io/alexmi256/rea-agent:latest bash -c \
-  'grep -rhoE "Hopper-[0-9.]+-Linux-demo[.a-z]+" "$(npm root -g)/rea-agents/dist" | sort -u'
+  'curl -fsSL -H "accept: application/json" -H "user-agent: rea-installer" \
+     "https://www.hopperapp.com/include/files-api.php?request=releases&public=true" \
+   | jq -r ".\"Ubuntu / Mint\" | [.version, .file_hash, .main_exe_hash] | @tsv"'
 ```
+
+Offline runs (air-gapped hosts) read the evidence baked under
+`/home/rea/.cache/rea/hopper-releases/<main_exe_hash>/`; that path lives under
+`$HOME`, so a container started as a *different* uid must fall back to the live
+feed (see `docs/BYO-LICENSES.md`).
 
 **`ldd /opt/hopper/bin/Hopper` shows missing libraries**
 REA's Linux path also needs Xvfb, Python 3 and the X11/XTEST libraries (all
@@ -175,11 +184,12 @@ The usual cause is `VAR: ${VAR:-}` in a compose `environment:` map (or an
 empty default. Comment a line out instead of blanking it.
 
 **Frida tools and the MCP catalog**
-REA 6.5.0 is the first release to expose the frida family (`list-frida-devices`,
-`list-frida-processes`, `instrument-with-frida`); through 6.4.0 it was on
+The frida family (`list-frida-devices`, `list-frida-processes`,
+`instrument-with-frida`) first appeared in REA 6.5.0; through 6.4.0 it was on
 repository `main` only. The image has always installed and verified the frida
 **binding** (`getLocalDevice()` returns the local system), so the 6.5.0 build
-arg is all that was needed. `rea --help` is the ground truth: if it lists no
+arg is all that was needed; the pin now tracks 17.24.1. `rea --help` is the
+ground truth: if it lists no
 frida command, the release you installed has none. Note that instrumentation
 executes foreign code and is destructive — it is not a read-only tool.
 
@@ -238,7 +248,7 @@ ownership once: `docker compose exec -u 0 rea-agent chown -R $(id -u):$(id -g) /
 **`docker compose pull` says denied / manifest unknown / not found**
 The GHCR packages are public, so `denied` usually means one of three things:
 you are pulling a name that does not exist yet (check
-`ghcr.io/alexmi256/rea-agent-ghidra:6.5.0-linux-amd64` exactly — tags are
+`ghcr.io/alexmi256/rea-agent-ghidra:6.7.0-linux-amd64` exactly — tags are
 per-image, there is no repo-wide `latest`), you are offline/behind a proxy that
 blocks `ghcr.io`, or a fork is asking for the upstream namespace. If *your own*
 pushed package is private, fix it once in the UI: package → **Settings → Change
@@ -255,7 +265,7 @@ scripts/image-name.sh ghidra          # or all | hopper | ida
 make sizes                            # what is actually present locally
 ```
 
-If you see a plain `rea-agent-ghidra:6.5.0-linux-amd64`, your `.env` is missing
+If you see a plain `rea-agent-ghidra:6.7.0-linux-amd64`, your `.env` is missing
 the GHCR values (copy them from `.env.example`).
 
 **A `--profile <engine> up -d` starts two containers**

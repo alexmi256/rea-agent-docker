@@ -23,16 +23,19 @@
 #       reported and deliberately do NOT fail: by policy they wait for the next
 #       rea-agents release.
 #
-# (2) is the one that matters for the engine and helper tools. REA 6.5.0 admits
-# Ghidra 12.1.4, Hopper 6.4.2-by-digest, Binwalk 3.1.x, Unblob 26.6.x, WABT
-# 1.0.42, sigrok-cli 0.7.2, TShark 4.x, jadx-headless-mcp 0.7.1, pwntools
-# 4.15.0, Wakaru ^1.13.0 - and it refuses builds that do not match (Hopper by
-# launcher SHA-256, the rest by version banner). So "newest upstream" is
+# (2) is the one that matters for the engine and helper tools. REA 6.7.0 admits
+# Ghidra 12.1.4, the Linux Hopper demo the publisher-signed vendor feed currently
+# offers (Hopper 6.6.0 - the fixed launcher-digest allowlist is gone), Binwalk
+# 3.1.x, Unblob 26.6.x, WABT 1.0.42, sigrok-cli 0.7.2, TShark 4.x,
+# jadx-headless-mcp 0.7.1, pwntools 4.15.0, Wakaru ^1.13.0 - and it refuses
+# builds that do not match (Hopper by the feed's authenticated launcher digest,
+# the rest by version banner). So "newest upstream" is
 # frequently the WRONG target for those rows: chasing apktool 3.x or ilspycmd 11
 # is a judgement call, while falling behind REA's admitted WABT is a breakage.
 #
-# Those expectations are read live from REA's own source at the pinned release
-# tag, so bumping REA_VERSION automatically re-derives them - which is what
+# Those expectations are read live from REA's own source - and, for Hopper, from
+# the vendor release feed REA itself reads - at the pinned release tag, so
+# bumping REA_VERSION automatically re-derives them - which is what
 # makes docs/UPDATES.md a procedure rather than a memory test.
 #
 # Every row carries the URL it was derived from, and a failed lookup is reported
@@ -67,10 +70,16 @@ REA_RAW = "https://raw.githubusercontent.com/{repo}/rea-agents-{version}/{path}"
 # REA source files that carry the admitted-version tables.
 REA_SOURCES = {
     "node": "src/domain/runtimeVersion.ts",
-    "ghidra": "src/ghidra/GhidraInstallationPolicy.ts",
-    "hopper": "src/application/LinuxHopper.ts",
+    "ghidra": "src/ghidra/GhidraReleasePolicy.ts",
     "tools": "src/application/CapabilityInventory.ts",
 }
+
+# Hopper is not in REA's source any more: since 6.6.0 the admitted Linux build is
+# whatever the publisher-signed vendor release feed currently offers
+# (src/application/HopperReleaseFeed.ts + LinuxHopperPublisher.ts), and the feed
+# only ever lists its current release. So read the feed REA reads.
+HOPPER_FEED_URL = "https://www.hopperapp.com/include/files-api.php?request=releases&public=true"
+HOPPER_FAMILY = "Ubuntu / Mint"
 
 # Statuses that mean "the image is wrong right now" - these fail the check.
 # `outdated` is deliberately NOT here: this project's policy is that a newer
@@ -269,8 +278,7 @@ class ReaAdmissions:
     node_range: str | None = None
     ghidra: str | None = None
     ghidra_java_major: str | None = None
-    hopper_deb: dict[str, str] = field(default_factory=dict)
-    hopper_hashes: list[str] = field(default_factory=list)
+    hopper_feed: dict[str, str] = field(default_factory=dict)
     tools: dict[str, dict[str, str]] = field(default_factory=dict)
     errors: dict[str, str] = field(default_factory=dict)
 
@@ -305,23 +313,18 @@ def scrape_rea(fetcher: Fetcher, version: str) -> ReaAdmissions:
         if match:
             admissions.ghidra_java_major = match.group(1)
 
-    hopper = raw("hopper")
-    if hopper:
-        deb = re.search(
-            r"deb:\s*\{\s*filename:\s*`[^`]*?(Hopper-[\w.\-]+)`,"
-            r"\s*file_length:\s*\"(\d+)\",\s*file_hash:\s*\"(\w+)\"",
-            hopper,
-            re.S,
-        )
-        if deb:
-            admissions.hopper_deb = {
-                "filename": deb.group(1),
-                "bytes": deb.group(2),
-                "sha1": deb.group(3),
-            }
-        hashes = re.search(r"SUPPORTED_HOPPER_SHA256\s*=\s*new Set\(\[(.*?)\]\)", hopper, re.S)
-        if hashes:
-            admissions.hopper_hashes = re.findall(r'"([0-9a-f]{64})"', hashes.group(1))
+    # Hopper: read the vendor feed instead of REA's source - REA itself admits a
+    # Linux build only against this feed's current release, and the old
+    # SUPPORTED_RELEASES/SUPPORTED_HOPPER_SHA256 tables are gone from the source.
+    try:
+        feed = fetcher.json(HOPPER_FEED_URL)
+        row = feed.get(HOPPER_FAMILY) if isinstance(feed, dict) else None
+        if isinstance(row, dict) and row:
+            admissions.hopper_feed = {str(k): str(v) for k, v in row.items()}
+        else:
+            admissions.errors["hopper"] = f"{HOPPER_FEED_URL}: no '{HOPPER_FAMILY}' release row"
+    except Exception as exc:  # noqa: BLE001
+        admissions.errors["hopper"] = f"{HOPPER_FEED_URL}: {exc}"
 
     tools = raw("tools")
     if tools:
@@ -496,7 +499,7 @@ def check_ghidra(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissio
         order = compare(pinned, latest)
         if order is not None and order < 0:
             row.status = "outdated"
-            row.hint = "bump GHIDRA_VERSION and GHIDRA_ZIP together (GhidraInstallationPolicy.ts admits one build)"
+            row.hint = "bump GHIDRA_VERSION and GHIDRA_ZIP together (GhidraReleasePolicy.ts verifies one build)"
     except Exception as exc:  # noqa: BLE001
         unknowable(row, exc)
     if admissions.ghidra:
@@ -518,39 +521,62 @@ def check_ghidra(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissio
 
 
 def check_hopper(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissions) -> list[Row]:
+    """Hopper: REA admits whatever the publisher-signed vendor feed currently
+    offers for Ubuntu/Mint, verified by the launcher digest carried in that
+    signed row. Our pin must be exactly that release - and the build itself
+    re-checks the feed, so a moved feed is caught before an image ships."""
     rows: list[Row] = []
-    sha1 = pins.get("HOPPER_DEB_SHA1", "")
-    expected = admissions.hopper_deb or {}
-    label_version = ""
-    if expected.get("filename"):
-        match = re.search(r"Hopper-([\w.]+)-Linux", expected["filename"])
-        label_version = match.group(1) if match else ""
+    feed = admissions.hopper_feed
+    feed_name = feed.get("filename", "").rsplit("/", 1)[-1]
+    match = re.search(r"Hopper-([\w.]+)-Linux", feed_name)
+    feed_version = match.group(1) if match else feed.get("version", "")
+    feed_sha1 = feed.get("file_hash", "")
+    feed_bytes = feed.get("file_length", "")
+    feed_launcher = feed.get("main_exe_hash", "")
 
-    row = Row("hopper", f"Hopper{(' ' + label_version) if label_version else ''}", "Engines", "ok",
-              pinned=sha1[:12] + "…" if sha1 else None,
-              admits=(expected.get("sha1", "")[:12] + "…") if expected.get("sha1") else None,
-              source=REA_RAW.format(repo=REA_REPO, version=admissions.version, path=REA_SOURCES["hopper"]))
-    if expected.get("sha1"):
-        if expected["sha1"] == sha1:
-            row.note = f"matches the REA-admitted demo package ({expected.get('bytes')} bytes)"
-        else:
+    pinned_version = pins.get("HOPPER_DEMO_VERSION", "")
+    pinned_sha1 = pins.get("HOPPER_DEB_SHA1", "")
+    pinned_bytes = pins.get("HOPPER_DEB_BYTES", "")
+
+    pinned_label = " ".join(part for part in (pinned_version, f"{pinned_sha1[:12]}…" if pinned_sha1 else "") if part)
+    admits_label = " ".join(part for part in (feed_version, f"{feed_sha1[:12]}…" if feed_sha1 else "") if part)
+    row = Row("hopper", f"Hopper{(' ' + feed_version) if feed_version else ''}", "Engines", "ok",
+              pinned=pinned_label or None,
+              admits=admits_label or None,
+              source=HOPPER_FEED_URL)
+    if not feed:
+        unknowable(row, RuntimeError(admissions.errors.get("hopper", "no vendor feed release row")))
+    else:
+        moved: list[str] = []
+        if pinned_version and feed_version and pinned_version != feed_version:
+            moved.append(f"the vendor feed now offers Hopper {feed_version} ({feed_name})")
+        if pinned_sha1 and feed_sha1 and pinned_sha1 != feed_sha1:
+            moved.append(f"the vendor feed's sha1 is {feed_sha1}")
+        if pinned_bytes and feed_bytes and pinned_bytes != feed_bytes:
+            moved.append(f"the vendor feed's package is {feed_bytes} bytes")
+        if moved:
             row.status = "behind-rea"
-            row.note = f"REA admits {expected.get('filename')} sha1 {expected['sha1']}"
-            row.hint = "re-pin HOPPER_DEB_SHA1/HOPPER_DEB_BYTES to the admitted package"
-    elif admissions.errors.get("hopper"):
-        unknowable(row, RuntimeError(admissions.errors["hopper"]))
-    if pins.get("HOPPER_DEB_BYTES") and expected.get("bytes") and pins["HOPPER_DEB_BYTES"] != expected["bytes"]:
-        row.status = "behind-rea"
-        row.note = (row.note + "; " if row.note else "") + (
-            f"HOPPER_DEB_BYTES={pins['HOPPER_DEB_BYTES']} but REA expects {expected['bytes']}"
-        )
+            row.note = "; ".join(moved)
+            row.hint = ("re-pin HOPPER_DEMO_VERSION, HOPPER_DEB_SHA1, HOPPER_DEB_BYTES and "
+                        "HOPPER_LAUNCHER_SHA256 to the feed's current Ubuntu/Mint release")
+        else:
+            row.note = f"matches the vendor feed's current signed demo ({feed_bytes} bytes)"
     rows.append(row)
 
-    launchers = Row("hopper-launcher", "Hopper admitted launcher hashes", "Engines", "info",
-                    admits=f"{len(admissions.hopper_hashes)} admitted launcher digest(s)")
-    launchers.note = "a Hopper build outside this set fails engine validation"
-    if admissions.errors.get("hopper"):
-        unknowable(launchers, RuntimeError(admissions.errors["hopper"]))
+    launcher_pin = pins.get("HOPPER_LAUNCHER_SHA256", "")
+    launchers = Row("hopper-launcher", "Hopper admitted launcher digest", "Engines", "info",
+                    pinned=(launcher_pin[:12] + "…") if launcher_pin else None,
+                    admits=(feed_launcher[:12] + "…") if feed_launcher else None,
+                    source=HOPPER_FEED_URL)
+    if not feed:
+        unknowable(launchers, RuntimeError(admissions.errors.get("hopper", "no vendor feed release row")))
+    elif launcher_pin and feed_launcher and launcher_pin != feed_launcher:
+        launchers.status = "behind-rea"
+        launchers.note = "the pinned launcher digest is not the one the feed authenticates"
+        launchers.hint = "bump HOPPER_LAUNCHER_SHA256 to the feed's main_exe_hash and rebuild"
+    else:
+        launchers.note = ("REA admits this launcher through the feed's signature; a licensed build "
+                          "is admitted by its own publisher evidence instead")
     rows.append(launchers)
     return rows
 
@@ -926,8 +952,7 @@ def main() -> int:
                     "node_range": admissions.node_range,
                     "ghidra": admissions.ghidra,
                     "ghidra_java_major": admissions.ghidra_java_major,
-                    "hopper_deb": admissions.hopper_deb,
-                    "hopper_launcher_hashes": len(admissions.hopper_hashes),
+                    "hopper_feed": admissions.hopper_feed,
                     "tools": admissions.tools,
                     "errors": admissions.errors,
                 },

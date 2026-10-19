@@ -34,24 +34,32 @@ FROM ubuntu:24.04 AS rea-agent
 ARG DEBIAN_FRONTEND=noninteractive
 
 # --- pinned upstream versions ------------------------------------------------
-ARG REA_VERSION=6.5.0
+ARG REA_VERSION=6.7.0
 ARG NODE_VERSION=24.22.0
 # REA declares frida as an optional dependency (JS instrumentation). npm 11
 # blocks package install scripts by default, so frida's native binding is
 # installed explicitly with --allow-scripts and linked into REA's tree.
-ARG FRIDA_VERSION=17.23.3
+ARG FRIDA_VERSION=17.24.1
 ARG GHIDRA_VERSION=12.1.4
 ARG GHIDRA_ZIP=ghidra_12.1.4_PUBLIC_20260921.zip
 ARG GHIDRA_SHA256=
 ARG GHIDRA_BASE_URL=https://github.com/NationalSecurityAgency/ghidra/releases/download
-# Hopper: REA 6.5.0 admits ONE Linux build per package family, matched by the
-# launcher's SHA-256 (src/application/LinuxHopper.ts -> SUPPORTED_RELEASES/
-# SUPPORTED_HOPPER_SHA256). Its pinned demo package is Hopper 6.4.2. Leave
-# HOPPER_DEB_URL empty to derive that filename straight out of the installed
-# REA package; override it (and clear HOPPER_DEB_SHA1) for a licensed DEB.
+# Hopper: REA 6.6.0 replaced the fixed launcher-digest allowlist with the
+# publisher-signed vendor release feed (src/application/HopperReleaseFeed.ts +
+# LinuxHopperPublisher.ts). REA now admits a Linux build only when it can verify
+# the launcher against that feed's *current* release, so the pin below IS "the
+# current public Linux demo" and the build fails loudly the moment the feed
+# moves. Leave HOPPER_DEB_URL empty to read the filename and every digest from
+# the feed (then compared against these pins); set it, and clear
+# HOPPER_DEB_SHA1, to install your own mirrored/modified package instead. A
+# licensed .deb dropped in vendor/ supersedes all of it (see vendor/README.md).
+ARG HOPPER_RELEASES_URL=https://www.hopperapp.com/include/files-api.php?request=releases&public=true
+ARG HOPPER_PUBLIC_KEY_URL=https://www.hopperapp.com/hopper-public-key.asc
 ARG HOPPER_DEB_URL=
-ARG HOPPER_DEB_SHA1=e4f79dff602648a8ff4a88b773875b6bfac0dc65
-ARG HOPPER_DEB_BYTES=35755772
+ARG HOPPER_DEMO_VERSION=6.6.0
+ARG HOPPER_DEB_SHA1=575efccfd1ab3565399d04ef420b81483b631864
+ARG HOPPER_DEB_BYTES=35748722
+ARG HOPPER_LAUNCHER_SHA256=b2271008fb82bf14cfae5c3644cdde2b11fc6804bd7c99d67032ec1b1942d53c
 ARG WABT_VERSION=1.0.42
 ARG JADX_MCP_VERSION=0.7.1
 ARG APKTOOL_VERSION=2.12.1
@@ -505,25 +513,54 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
 # Official public demo .deb -> /opt/hopper. A licensed .deb dropped in
 # vendor/ supersedes it (see vendor/README.md). Hopper's headless Linux path
 # is driven by REA on a private Xvfb display, demo mode included.
+#
+# REA 6.6.0+ admits a Linux Hopper build by verifying its launcher against the
+# publisher-signed vendor release feed, so the build:
+#   1. reads the feed, and fails if its current Ubuntu/Mint release is not
+#      exactly the pinned one (that is the update trigger, not a surprise at
+#      runtime);
+#   2. verifies the downloaded package against the feed's byte length + SHA-1
+#      and the installed launcher against the feed's main_exe_hash;
+#   3. retains that signed evidence (release row + vendor public key + the
+#      package bytes) under REA's own cache path, so REA can admit the launcher
+#      without network access.
 RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
     set -eux; \
     case "${REA_ENGINE}" in all|hopper) : ;; *) echo "skipping Hopper (REA_ENGINE=${REA_ENGINE})"; exit 0 ;; esac; \
     cd /var/cache/rea-dl; \
-    deb="$(ls /opt/rea-vendor/*.deb 2>/dev/null | head -n1 || true)"; \
-    if [ -n "$deb" ]; then \
-      echo "Using vendor-supplied Hopper package: $deb"; \
-      cp "$deb" /tmp/hopper.deb; \
+    evidence="/home/${REA_USER}/.cache/rea/hopper-releases"; \
+    vendor_deb="$(ls /opt/rea-vendor/*.deb 2>/dev/null | head -n1 || true)"; \
+    from_feed=0; \
+    if [ -n "$vendor_deb" ]; then \
+      echo "Using vendor-supplied Hopper package: $vendor_deb"; \
+      cp "$vendor_deb" /tmp/hopper.deb; \
     else \
       url="${HOPPER_DEB_URL}"; \
-      if [ -z "$url" ]; then \
-        filename="$(grep -rhoE 'Hopper-[0-9]+\.[0-9]+\.[0-9]+-Linux-demo\.deb' \
-          "$(npm root -g)/rea-agents/dist" 2>/dev/null | head -n1 || true)"; \
-        [ -n "$filename" ] || filename="Hopper-6.4.2-Linux-demo.deb"; \
-        url="https://www.hopperapp.com:443/downloader/public/${filename}"; \
-        echo "REA pins this Linux Hopper demo package: ${filename}"; \
+      if [ -n "${HOPPER_DEB_SHA1}" ]; then \
+        from_feed=1; \
+        feed=/tmp/hopper-release-feed.json; \
+        curl -fsSL -H "accept: application/json" -H "user-agent: rea-installer" \
+          -o "$feed" "${HOPPER_RELEASES_URL}"; \
+        jq -e '."Ubuntu / Mint"' "$feed" > /dev/null; \
+        feed_version="$(jq -r '."Ubuntu / Mint".version' "$feed")"; \
+        debname="$(jq -r '."Ubuntu / Mint".filename | split("/") | last' "$feed")"; \
+        feed_sha1="$(jq -r '."Ubuntu / Mint".file_hash' "$feed")"; \
+        feed_bytes="$(jq -r '."Ubuntu / Mint".file_length' "$feed")"; \
+        feed_main="$(jq -r '."Ubuntu / Mint".main_exe_hash' "$feed")"; \
+        echo "vendor feed offers Linux Hopper ${feed_version} (${debname}, ${feed_bytes} bytes)"; \
+        test "$debname" = "Hopper-${HOPPER_DEMO_VERSION}-Linux-demo.deb" \
+          || { echo "Hopper feed moved: ${debname} is no longer Hopper-${HOPPER_DEMO_VERSION}-Linux-demo.deb - bump HOPPER_DEMO_VERSION and its digests (docs/UPDATES.md section B)"; exit 1; }; \
+        test "$feed_sha1" = "${HOPPER_DEB_SHA1}" \
+          || { echo "Hopper feed moved: sha1 ${feed_sha1} != pin ${HOPPER_DEB_SHA1}"; exit 1; }; \
+        test "$feed_bytes" = "${HOPPER_DEB_BYTES}" \
+          || { echo "Hopper feed moved: ${feed_bytes} != pin ${HOPPER_DEB_BYTES} bytes"; exit 1; }; \
+        test "$feed_main" = "${HOPPER_LAUNCHER_SHA256}" \
+          || { echo "Hopper feed moved: launcher ${feed_main} != pin ${HOPPER_LAUNCHER_SHA256}"; exit 1; }; \
+        [ -n "$url" ] || url="https://www.hopperapp.com:443/downloader/public/${debname}"; \
       fi; \
+      [ -n "$url" ] || { echo "no Hopper package to install: set HOPPER_DEB_URL or HOPPER_DEB_SHA1"; exit 1; }; \
       echo "Downloading ${url}"; \
-      debname="$(basename "$url")"; \
+      debname="${debname:-$(basename "$url")}"; \
       [ -f "$debname" ] || curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" \
         -H "Referer: https://www.hopperapp.com/download" -o "$debname" "$url"; \
       if [ -n "${HOPPER_DEB_BYTES}" ]; then \
@@ -542,7 +579,23 @@ RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
     test -x /opt/hopper/bin/Hopper; \
     ldd /opt/hopper/bin/Hopper | grep -c "not found" || true; \
     chmod -R a+rX /opt/hopper; \
-    echo "Hopper launcher sha256: $(sha256sum /opt/hopper/bin/Hopper | cut -d' ' -f1)"
+    launcher="$(sha256sum /opt/hopper/bin/Hopper | cut -d' ' -f1)"; \
+    echo "Hopper launcher sha256: ${launcher}"; \
+    if [ "$from_feed" = "1" ]; then \
+      test "$launcher" = "${HOPPER_LAUNCHER_SHA256}" \
+        || { echo "installed Hopper launcher ${launcher} is not the admitted demo ${HOPPER_LAUNCHER_SHA256}"; exit 1; }; \
+      mkdir -p "${evidence}/${launcher}"; \
+      install -m 0644 "$debname" "${evidence}/${launcher}/archive"; \
+      jq -c '{format:"rea-signed-hopper-release-v1", family:"deb", release:."Ubuntu / Mint"}' \
+        "$feed" > "${evidence}/${launcher}/release.json"; \
+      curl -fsSL -H "user-agent: rea-installer" \
+        -o "${evidence}/${launcher}/public-key.asc" "${HOPPER_PUBLIC_KEY_URL}"; \
+      chmod 0644 "${evidence}/${launcher}/release.json" "${evidence}/${launcher}/public-key.asc"; \
+      chown -R "${REA_UID}:${REA_GID}" "/home/${REA_USER}/.cache"; \
+      mkdir -p /usr/local/share/rea; \
+      printf '%s\n' "${launcher}" > /usr/local/share/rea/hopper-launcher.sha256; \
+      echo "retained publisher-signed Hopper evidence: ${evidence}/${launcher}"; \
+    fi
 
 # --- 17c. Optional in-image IDA (REA_ENGINE=all|ida) ------------------------
 # OFF BY DEFAULT: Hex-Rays does not permit redistribution of IDA, and a

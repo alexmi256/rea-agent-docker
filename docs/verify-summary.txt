@@ -2,13 +2,13 @@
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 rea-agent verification
-run:       20261014T210000Z
-date:      2026-10-14T21:11:40Z
-image:     ghcr.io/alexmi256/rea-agent:6.5.0-linux-amd64
+run:       20261019T014730Z
+date:      2026-10-19T01:59:20Z
+image:     ghcr.io/alexmi256/rea-agent:6.7.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
-node:      v24.21.0
-rea:       6.5.0
-passed:    107
+node:      v24.22.0
+rea:       6.7.0
+passed:    120
 failed:    0
 skipped:   3
 
@@ -25,6 +25,21 @@ Interpretation of the 3 skips (all conditional, none an image defect):
   ida doctor / jeb client
       Bring-your-own commercial engines; skipped because no registration was
       configured for this run.
+
+The counts are unchanged from the previous dependency round (2026-10-15,
+REA 6.5.0) on every engine image: `all` 120/0/3, `ghidra` 108/0/8,
+`hopper` 101/0/7, `ida` 93/0/11. That is the expected result for this bump:
+REA 6.6.0/6.7.0 added no tool family and removed none, the catalog is still 207
+MCP tools, and the change that did matter - Hopper admission moving from a fixed
+launcher-digest allowlist to the vendor's publisher-signed release feed - is a
+change of *gate*, not of count.
+
+What the 6.7.0 run newly establishes: the Hopper launcher digest asserted
+against the build-time marker is the one the vendor feed authenticates
+(`b2271008...`, i.e. Hopper 6.6.0 rather than the previous 6.4.2 build, which REA
+no longer admits at all), and REA reports that same digest back in the provider
+identity of every Hopper analysis profile - so the retained signed evidence is
+genuinely what is being verified, not merely present in the image.
 
 On REA 6.4.0 the same harness reported 14 skips: the sqlite, wasm, go-binary,
 pcap x3, sigrok x2 and frida families were `main`-only and skipped as "not in

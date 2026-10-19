@@ -26,7 +26,7 @@ reuses every shared layer from cache. Notable orderings and pins:
 | ----- | -------- | ----------------------- |
 | 1 | build/runtime basics: compilers, `gdb`/`gdb-multiarch`, `strace`, `ltrace`, `binutils`, `elfutils`, `yara`, `upx-ucl`, `nasm`, `qemu-user-static`, `binfmt-support`, X11/EGL/GBM/font stack, `xvfb`, `socat`, `tcpdump`, `util-linux` (prlimit) | Ubuntu 24.04 archives |
 | 2 | **Node.js** + npm | 24.22.0 (REA needs 22.19+/24.11+/26+) |
-| 3 | **REA** (`rea-agents`) globally installed → `rea` on PATH | 6.5.0 |
+| 3 | **REA** (`rea-agents`) globally installed → `rea` on PATH | 6.7.0 |
 | 4 | **WABT** (wasm toolchain), **jadx-headless-mcp** (Android Java engine) and **Wakaru** (JavaScript source recovery) | WABT 1.0.42, jadx-headless-mcp 0.7.1, Wakaru 1.14.0 |
 | 5 | **Apktool** launcher (Java wrapper + jar) | 2.12.1 (2.x line REA verified) |
 | 6 | **.NET SDK 8** + `ilspycmd` in `/opt/dotnet-tools` | ilspycmd 8.2.0.7535 |
@@ -38,7 +38,7 @@ reuses every shared layer from cache. Notable orderings and pins:
 | 12 | **uv** and **supergateway** (stdio↔Streamable HTTP MCP bridge) | uv 0.13.1, supergateway 4.2.0 |
 | 13 | non-root user `rea` (uid/gid 1000), writable dirs, `ilspycmd`, entrypoint, healthcheck, verification harness, IDA templates | - |
 | **17a** | **Ghidra** + native decompiler for `linux_x86_64` (JDK 21 is layer 1 and lives in every image) — `REA_ENGINE=all\|ghidra` | Ghidra 12.1.4 |
-| **17b** | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime — `REA_ENGINE=all\|hopper` | Hopper 6.4.2 Linux |
+| **17b** | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime — `REA_ENGINE=all\|hopper` | Hopper 6.6.0 Linux (the build the vendor feed authenticates) |
 | **17c** | optional in-image **IDA**, only from `vendor/ida/*.run` — `REA_ENGINE=all\|ida` | off by default |
 | **17d** | **engine configuration**: `/usr/local/share/rea/engine`, `/usr/local/share/rea/engine.env`, and the `rea` wrapper that sources it | - |
 

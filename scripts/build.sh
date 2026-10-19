@@ -37,7 +37,7 @@ IMAGE=""       # set by --image, else derived from the engine via image-name.sh
 DOCKER="${DOCKER:-docker}"
 BUILD_ARGS=()
 ENGINE="all"
-REA_TAG="${REA_TAG:-6.5.0-linux-amd64}"
+REA_TAG="${REA_TAG:-6.7.0-linux-amd64}"
 
 usage() { sed -n '2,20p' "$0"; exit 0; }
 
@@ -78,7 +78,7 @@ ENV_FILE=""
 if [ -f "$PROJECT_DIR/.env" ]; then
     # shellcheck disable=SC1091
     . "$PROJECT_DIR/.env"
-    REA_TAG="${REA_TAG:-6.5.0-linux-amd64}"
+    REA_TAG="${REA_TAG:-6.7.0-linux-amd64}"
 fi
 # Image name: --image wins, otherwise the shared helper (which reads .env, so a
 # GHCR-published name here means `docker build` tags exactly what compose pulls).
