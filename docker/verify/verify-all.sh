@@ -4,7 +4,7 @@
 #
 #   docker compose exec rea-agent /opt/rea/verify/verify-all.sh
 #   docker run --rm -v "$PWD/work:/work" \
-#     ghcr.io/alexmi256/rea-agent-ghidra:6.7.0-linux-amd64 /opt/rea/verify/verify-all.sh --quick
+#     ghcr.io/alexmi256/rea-agent-ghidra:6.8.0-linux-amd64 /opt/rea/verify/verify-all.sh --quick
 #
 # Phases (each writes raw stdout/stderr under <report>/logs):
 #   1 tools      tool presence + versions

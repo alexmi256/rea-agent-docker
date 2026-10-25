@@ -177,7 +177,7 @@ anything reproducible should pin the version tag (see `docs/IMAGES.md`).
 ### Ghidra (exact version)
 
 REA's adapter is verified against one build (`SUPPORTED_GHIDRA_VERSION` in
-`src/ghidra/GhidraInstallationPolicy.ts`), and a different one reports
+`src/ghidra/GhidraReleasePolicy.ts`), and a different one reports
 `config_drift` while everything still looks installed.
 
 ```bash
@@ -399,7 +399,16 @@ Everything lives in `scripts/check-updates.py`:
   it via `admissions.tool("<key>")`;
 * **a new REA source file** → add it to `REA_SOURCES` (REA moves these: the
   Ghidra policy moved from `GhidraInstallationPolicy.ts` to
-  `GhidraReleasePolicy.ts` in 6.6.x, and Hopper left the source entirely);
+  `GhidraReleasePolicy.ts` in 6.6.x, Hopper left the source entirely, and in
+  6.8.0 binwalk/unblob left the `CapabilityInventory` remediation prose for
+  `src/contracts/firmware/firmwareToolRequirements.ts` — a row that loses its
+  source still prints `ok`, so a bump is where you check each row still *shows*
+  the admitted value);
+* **a requirement that becomes structured data** → prefer parsing the data over
+  the prose it generates (`scrape_rea` reads `defineToolRequirement({…})`
+  blocks first and only falls back to the remediation string): prose can be
+  reworded without changing the gate, and a reworded string silently stops
+  matching;
 * **an admission that lives outside REA's source** → `scrape_rea` already does
   this for Hopper: `admissions.hopper_feed` is the vendor's signed release feed
   (`HOPPER_FEED_URL`), which is what REA itself now validates against;
@@ -436,7 +445,7 @@ passes when it cannot see upstream is worse than no check.
   fixed by bumping the pins, not by pinning the old URL harder; `make
   check-updates` reports it as `BEHIND-REA` the moment it happens.
 * **"Newer" and "admitted" can point in opposite directions.** jadx-headless-mcp
-  is the live example: we pin 0.7.1 because REA 6.7.0 admits 0.7.1, while npm
+  is the live example: we pin 0.7.1 because REA 6.8.0 admits 0.7.1, while npm
   still only publishes 0.7.0. The checker reports that as fine, and it is.
 * **GHCR tags are per image.** There is no repo-wide `latest`; bumps add tags and
   leave old ones in place.

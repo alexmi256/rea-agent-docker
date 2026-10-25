@@ -23,7 +23,7 @@
 #       reported and deliberately do NOT fail: by policy they wait for the next
 #       rea-agents release.
 #
-# (2) is the one that matters for the engine and helper tools. REA 6.7.0 admits
+# (2) is the one that matters for the engine and helper tools. REA 6.8.0 admits
 # Ghidra 12.1.4, the Linux Hopper demo the publisher-signed vendor feed currently
 # offers (Hopper 6.6.0 - the fixed launcher-digest allowlist is gone), Binwalk
 # 3.1.x, Unblob 26.6.x, WABT 1.0.42, sigrok-cli 0.7.2, TShark 4.x,
@@ -72,6 +72,11 @@ REA_SOURCES = {
     "node": "src/domain/runtimeVersion.ts",
     "ghidra": "src/ghidra/GhidraReleasePolicy.ts",
     "tools": "src/application/CapabilityInventory.ts",
+    # binwalk/unblob left the CapabilityInventory remediation prose in 6.8.0 and
+    # became structured requirements here (`name` + `version: [major, minor,
+    # patch]`). Without this source those two rows read as "no admission" and
+    # stop verifying anything, which looks like a green check.
+    "firmware": "src/contracts/firmware/firmwareToolRequirements.ts",
 }
 
 # Hopper is not in REA's source any more: since 6.6.0 the admitted Linux build is
@@ -349,6 +354,25 @@ def scrape_rea(fetcher: Fetcher, version: str) -> ReaAdmissions:
             admissions.tools[name] = {
                 "required": groups[0],
                 "verified": groups[1] if len(groups) > 1 else groups[0],
+            }
+
+    # Structured firmware requirements win over the prose when both exist: since
+    # 6.8.0 these are the values REA builds its own remediation string from, so
+    # they are the gate rather than a description of it.
+    firmware = raw("firmware")
+    if firmware:
+        for block in re.finditer(r"defineToolRequirement\(\{(.*?)\}\)", firmware, re.S):
+            body = block.group(1)
+            name = re.search(r'name:\s*"([^"]+)"', body)
+            ver_match = re.search(r"version:\s*\[(\d+),\s*(\d+),\s*(\d+)\]", body)
+            if not (name and ver_match):
+                continue
+            major, minor, patch = ver_match.groups()
+            admissions.tools[name.group(1).lower()] = {
+                # REA states the minor line as the requirement and the exact
+                # build it verified against ("3.1.x (verified with 3.1.0)").
+                "required": f"{major}.{minor}",
+                "verified": f"{major}.{minor}.{patch}",
             }
     return admissions
 

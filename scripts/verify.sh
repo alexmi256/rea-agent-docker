@@ -6,7 +6,7 @@
 #   scripts/verify.sh --quick              # tool presence, static analysis, MCP handshake
 #   scripts/verify.sh --only tools,mcp
 #   scripts/verify.sh --engine hopper      # whatever image that engine resolves to
-#   scripts/verify.sh --image ghcr.io/<owner>/rea-agent-hopper:6.7.0-linux-amd64
+#   scripts/verify.sh --image ghcr.io/<owner>/rea-agent-hopper:6.8.0-linux-amd64
 #   scripts/verify.sh --compose --service rea-ghidra   # exec inside a compose service
 # =============================================================================
 set -euo pipefail

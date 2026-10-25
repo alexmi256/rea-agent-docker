@@ -2,13 +2,13 @@
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 rea-agent verification
-run:       20261019T014730Z
-date:      2026-10-19T01:59:20Z
-image:     ghcr.io/alexmi256/rea-agent:6.7.0-linux-amd64
+run:       20261025T093139Z
+date:      2026-10-25T09:43:41Z
+image:     ghcr.io/alexmi256/rea-agent:6.8.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
-node:      v24.22.0
-rea:       6.7.0
-passed:    120
+node:      v24.22.1
+rea:       6.8.0
+passed:    121
 failed:    0
 skipped:   3
 
@@ -26,35 +26,32 @@ Interpretation of the 3 skips (all conditional, none an image defect):
       Bring-your-own commercial engines; skipped because no registration was
       configured for this run.
 
-The counts are unchanged from the previous dependency round (2026-10-15,
-REA 6.5.0) on every engine image: `all` 120/0/3, `ghidra` 108/0/8,
-`hopper` 101/0/7, `ida` 93/0/11. That is the expected result for this bump:
-REA 6.6.0/6.7.0 added no tool family and removed none, the catalog is still 207
-MCP tools, and the change that did matter - Hopper admission moving from a fixed
-launcher-digest allowlist to the vendor's publisher-signed release feed - is a
-change of *gate*, not of count.
+The counts move by exactly one per image against the 6.7.0 sweep - `all`
+121/0/3, `ghidra` 109/0/8, `hopper` 102/0/7, `ida` 94/0/11 - because this bump
+added one check rather than one capability: REA 6.8.0 narrowed `extract-artifact`
+to a single positional path (it chooses the destination itself and refuses a
+second positional), so the old "exit 0" check was replaced by a JSON assertion
+on the extraction plus a check that the reported files exist under the reported
+`output_root`. That is one check more and a stronger claim.
 
-What the 6.7.0 run newly establishes: the Hopper launcher digest asserted
-against the build-time marker is the one the vendor feed authenticates
-(`b2271008...`, i.e. Hopper 6.6.0 rather than the previous 6.4.2 build, which REA
-no longer admits at all), and REA reports that same digest back in the provider
-identity of every Hopper analysis profile - so the retained signed evidence is
-genuinely what is being verified, not merely present in the image.
-
-On REA 6.4.0 the same harness reported 14 skips: the sqlite, wasm, go-binary,
-pcap x3, sigrok x2 and frida families were `main`-only and skipped as "not in
-REA <version>", and the RISC-V64/PowerPC ELF searches were refused by artifact
-admission. All of those now run for real on 6.5.0 and are listed as passes.
+What the 6.8.0 run establishes beyond the 6.7.0 round: the image runs on
+Node 24.22.1, which is the new floor for the 24.x line (`^22.23.4 || ^24.22.1 ||
+>=26.12.1`; 24.22.0 - fine for 6.7.0 - is refused outright); the catalog is now
+229 MCP tools (bundled skill v49, up from v42/207); and no engine admission
+moved - Ghidra is still 12.1.4/Java 21 and Hopper is still the vendor feed's
+6.6.0 launcher `b2271008...`, which the harness re-proves from the retained
+signed evidence on every Hopper image.
 
 Verified in this run: Ghidra analyze/function/decompile/instructions (x86-64),
 import+search across AArch64/ARMv7/MIPS32 BE+LE/RISC-V64/PowerPC/PE32+, AArch64
 and MIPS32 decompilation, Hopper demo-mode analyze/decompile/search, ELF layout
 (pwntools), managed artifact + members + a real ilspycmd decompilation, EVM
 selectors, JS/Electron application graph + evidence->view round trip, historical
-source import, SQLite schema+rows and a WABT wasm inspection and a Go-metadata
-probe, firmware regions + extraction, HAR + live mitmdump capture, Chrome CDP
+source import, SQLite schema+rows, a WABT wasm inspection and a Go-metadata
+probe, firmware regions + extraction, artifact inspect/extract with containment
+and cleanup verified, HAR + live mitmdump capture, Chrome CDP
 target/page/screenshot, Playwright launch->click->DOM, tshark pcap fields/summary,
 sigrok decoder search + VCD UART decode, PTY process capture, adb/apktool/JADX,
-frida binding + frida device inventory, MCP stdio handshake (207 tools) +
+frida binding + frida device inventory, MCP stdio handshake (229 tools) +
 engine-free tools/call + Ghidra open_binary/analyze_function/close_binary, and
 the Streamable HTTP bridge.

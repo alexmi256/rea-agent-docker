@@ -34,8 +34,10 @@ FROM ubuntu:24.04 AS rea-agent
 ARG DEBIAN_FRONTEND=noninteractive
 
 # --- pinned upstream versions ------------------------------------------------
-ARG REA_VERSION=6.7.0
-ARG NODE_VERSION=24.22.0
+ARG REA_VERSION=6.8.0
+# REA 6.8.0's engines.node is ^22.23.4 || ^24.22.1 || >=26.12.1, so 24.22.0 -
+# fine for 6.7.0 - is now *refused*. The runtime has to move with it.
+ARG NODE_VERSION=24.22.1
 # REA declares frida as an optional dependency (JS instrumentation). npm 11
 # blocks package install scripts by default, so frida's native binding is
 # installed explicitly with --allow-scripts and linked into REA's tree.

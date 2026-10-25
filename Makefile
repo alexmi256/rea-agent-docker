@@ -14,7 +14,7 @@ SHELL := /bin/bash
 ENGINE ?= all
 DOCKER ?= docker
 COMPOSE ?= $(DOCKER) compose
-TAG_SUFFIX ?= 6.7.0-linux-amd64
+TAG_SUFFIX ?= 6.8.0-linux-amd64
 
 # engine -> compose service / profile (the image name comes from
 # scripts/image-name.sh, which also honours the REA_*_IMAGE names in .env, so a

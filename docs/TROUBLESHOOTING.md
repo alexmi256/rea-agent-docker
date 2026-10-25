@@ -248,7 +248,7 @@ ownership once: `docker compose exec -u 0 rea-agent chown -R $(id -u):$(id -g) /
 **`docker compose pull` says denied / manifest unknown / not found**
 The GHCR packages are public, so `denied` usually means one of three things:
 you are pulling a name that does not exist yet (check
-`ghcr.io/alexmi256/rea-agent-ghidra:6.7.0-linux-amd64` exactly — tags are
+`ghcr.io/alexmi256/rea-agent-ghidra:6.8.0-linux-amd64` exactly — tags are
 per-image, there is no repo-wide `latest`), you are offline/behind a proxy that
 blocks `ghcr.io`, or a fork is asking for the upstream namespace. If *your own*
 pushed package is private, fix it once in the UI: package → **Settings → Change
@@ -265,7 +265,7 @@ scripts/image-name.sh ghidra          # or all | hopper | ida
 make sizes                            # what is actually present locally
 ```
 
-If you see a plain `rea-agent-ghidra:6.7.0-linux-amd64`, your `.env` is missing
+If you see a plain `rea-agent-ghidra:6.8.0-linux-amd64`, your `.env` is missing
 the GHCR values (copy them from `.env.example`).
 
 **A `--profile <engine> up -d` starts two containers**

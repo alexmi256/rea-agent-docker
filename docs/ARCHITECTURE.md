@@ -25,8 +25,8 @@ reuses every shared layer from cache. Notable orderings and pins:
 | Layer | Contents | Notable pinned versions |
 | ----- | -------- | ----------------------- |
 | 1 | build/runtime basics: compilers, `gdb`/`gdb-multiarch`, `strace`, `ltrace`, `binutils`, `elfutils`, `yara`, `upx-ucl`, `nasm`, `qemu-user-static`, `binfmt-support`, X11/EGL/GBM/font stack, `xvfb`, `socat`, `tcpdump`, `util-linux` (prlimit) | Ubuntu 24.04 archives |
-| 2 | **Node.js** + npm | 24.22.0 (REA needs 22.19+/24.11+/26+) |
-| 3 | **REA** (`rea-agents`) globally installed → `rea` on PATH | 6.7.0 |
+| 2 | **Node.js** + npm | 24.22.1 (REA 6.8.0 needs 22.23.4+/24.22.1+/26.12.1+) |
+| 3 | **REA** (`rea-agents`) globally installed → `rea` on PATH | 6.8.0 |
 | 4 | **WABT** (wasm toolchain), **jadx-headless-mcp** (Android Java engine) and **Wakaru** (JavaScript source recovery) | WABT 1.0.42, jadx-headless-mcp 0.7.1, Wakaru 1.14.0 |
 | 5 | **Apktool** launcher (Java wrapper + jar) | 2.12.1 (2.x line REA verified) |
 | 6 | **.NET SDK 8** + `ilspycmd` in `/opt/dotnet-tools` | ilspycmd 8.2.0.7535 |

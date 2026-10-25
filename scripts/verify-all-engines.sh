@@ -33,7 +33,7 @@ if [ -f "$PROJECT_DIR/.env" ]; then
     # shellcheck disable=SC1091
     . "$PROJECT_DIR/.env"
 fi
-TAG_SUFFIX="${REA_TAG:-6.7.0-linux-amd64}"
+TAG_SUFFIX="${REA_TAG:-6.8.0-linux-amd64}"
 
 image_for() {
     "$PROJECT_DIR/scripts/image-name.sh" "$1"

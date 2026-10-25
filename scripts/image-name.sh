@@ -14,7 +14,7 @@
 #      and pulling agree by default)
 #   2. a plain local name: rea-agent[-<engine>]:<tag>
 #
-# REA_TAG overrides the tag suffix (default 6.7.0-linux-amd64).
+# REA_TAG overrides the tag suffix (default 6.8.0-linux-amd64).
 # =============================================================================
 set -euo pipefail
 
@@ -27,7 +27,7 @@ if [ -f "$PROJECT_DIR/.env" ]; then
 fi
 
 engine="${1:-all}"
-tag="${REA_TAG:-6.7.0-linux-amd64}"
+tag="${REA_TAG:-6.8.0-linux-amd64}"
 
 case "$engine" in
     all)    configured="${REA_IMAGE:-}";        default="rea-agent:$tag" ;;

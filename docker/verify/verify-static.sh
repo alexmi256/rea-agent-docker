@@ -12,7 +12,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib.sh"
 
 FIX="$REA_VERIFY_FIXTURES"
-WORK_ARTIFACT="$(mktemp -d "${TMPDIR:-/tmp}/rea-verify-artifact.XXXXXX")"
 
 section "ELF layout (pwntools 4.15.0)"
 if [ -s "$FIX/fixture-x86_64.elf" ]; then
@@ -31,7 +30,32 @@ if [ -d "$FIX/jsapp/src" ]; then
 fi
 if [ -s "$FIX/bundle.zip" ]; then
     check_rea "inspect-artifact on a zip bundle" inspect-artifact "." -- "$FIX/bundle.zip" --json
-    check_rea "extract-artifact on a zip bundle" extract-artifact "." -- "$FIX/bundle.zip" "$WORK_ARTIFACT" --json
+    # REA 6.8.0 narrowed extract-artifact to a single positional path and picks
+    # the destination itself (`output_root` in the result); a second positional
+    # is refused outright. Assert the extraction rather than the exit status:
+    # containment verified, coverage complete, cleanup accounted for, every
+    # reported file non-empty - and then that those files exist on disk.
+    check_rea_json "extract-artifact on a zip bundle" extract-artifact \
+        '(.normalized_result.containment_verified == true)
+         and (.normalized_result.coverage.status == "complete")
+         and (.normalized_result.cleanup.verified == true)
+         and ((.normalized_result.artifacts | length) > 0)
+         and (([.normalized_result.artifacts[]
+                | select(.created == true and .bytes_written > 0)] | length)
+              == (.normalized_result.artifacts | length))' \
+        -- "$FIX/bundle.zip" --json
+    extract_out="$LOGDIR/extract-artifact_on_a_zip_bundle.out"
+    if [ -s "$extract_out" ]; then
+        extract_root="$(jq -r '.normalized_result.output_root // empty' "$extract_out")"
+        extract_missing="$(jq -r '.normalized_result.artifacts[].relative_path' "$extract_out" \
+            | while read -r rel; do [ -f "$extract_root/$rel" ] || printf '%s ' "$rel"; done)"
+        if [ -n "$extract_root" ] && [ -z "$extract_missing" ]; then
+            _ok "extracted files exist under the reported output_root"
+        else
+            _bad "extracted files exist under the reported output_root" \
+                 "root=${extract_root:-<none>} missing=${extract_missing:-<none>}"
+        fi
+    fi
 fi
 
 section "Apple static formats (platform-scoped in REA)"
