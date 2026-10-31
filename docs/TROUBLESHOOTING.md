@@ -80,7 +80,7 @@ Keep at least ~2× the largest target's expected working set free on the host;
 Since REA 6.6.0 the gate is not a fixed digest allowlist but the vendor's
 **publisher-signed release feed**: REA authenticates the installed launcher
 against the feed's current `main_exe_hash`, and the feed only offers its current
-release. This image installs that release (Hopper 6.6.0) and retains the signed
+release. This image installs that release (Hopper 6.6.1) and retains the signed
 evidence, so it is admitted offline; a licensed or hand-built Hopper reports drift
 even though it may analyse fine. To see which build your REA expects:
 

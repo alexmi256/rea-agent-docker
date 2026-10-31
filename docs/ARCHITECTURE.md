@@ -38,7 +38,7 @@ reuses every shared layer from cache. Notable orderings and pins:
 | 12 | **uv** and **supergateway** (stdio↔Streamable HTTP MCP bridge) | uv 0.13.1, supergateway 4.2.0 |
 | 13 | non-root user `rea` (uid/gid 1000), writable dirs, `ilspycmd`, entrypoint, healthcheck, verification harness, IDA templates | - |
 | **17a** | **Ghidra** + native decompiler for `linux_x86_64` (JDK 21 is layer 1 and lives in every image) — `REA_ENGINE=all\|ghidra` | Ghidra 12.1.4 |
-| **17b** | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime — `REA_ENGINE=all\|hopper` | Hopper 6.6.0 Linux (the build the vendor feed authenticates) |
+| **17b** | **Hopper** (official public demo `.deb`) + Qt6/Xvfb runtime — `REA_ENGINE=all\|hopper` | Hopper 6.6.1 Linux (the build the vendor feed authenticates) |
 | **17c** | optional in-image **IDA**, only from `vendor/ida/*.run` — `REA_ENGINE=all\|ida` | off by default |
 | **17d** | **engine configuration**: `/usr/local/share/rea/engine`, `/usr/local/share/rea/engine.env`, and the `rea` wrapper that sources it | - |
 

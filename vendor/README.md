@@ -16,7 +16,7 @@ directory is ever committed (see `.gitignore`).
 
 ```bash
 # You own a Hopper licence and downloaded the licensed DEB:
-cp ~/Downloads/Hopper-6.6.0-Linux.deb vendor/
+cp ~/Downloads/Hopper-6.6.1-Linux.deb vendor/
 make build            # or: make build-hopper for the Hopper-only image
 # (equivalent to scripts/build.sh --engine all, which passes REA_UID/REA_GID too)
 ```

@@ -15,7 +15,7 @@ engineering without installing a single tool on the host.
 * **Base:** `ubuntu:24.04` — the distribution REA's Hopper installer and
   Ghidra/JDK bindings are verified against, and the one that resolves every
   pinned helper version from apt.
-* **Engines:** Ghidra 12.1.4 (multi-architecture, the default), Hopper 6.6.0
+* **Engines:** Ghidra 12.1.4 (multi-architecture, the default), Hopper 6.6.1
   (public demo, headless via Xvfb), IDA Pro/Home/Free (bring your own licence).
 * **Four images, one per engine:** `rea-agent` (Ghidra + Hopper), `rea-agent-ghidra`,
   `rea-agent-hopper`, `rea-agent-ida` (no bundled engine). Same auxiliary
@@ -121,7 +121,7 @@ Full walkthrough: [docs/HERMES-MCP.md](docs/HERMES-MCP.md).
 | Family | Tools | Pinned |
 | ------ | ----- | ------ |
 | REA | `rea-agents` CLI + MCP server | 6.8.0 (Node 24.22.1) |
-| Native engines | Ghidra + JDK 21, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.1.4, Hopper 6.6.0 |
+| Native engines | Ghidra + JDK 21, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.1.4, Hopper 6.6.1 |
 | ELF/core analysis | pwntools + pyelftools + Unicorn in a venv, `gdb` + `gdb-multiarch`, pwndbg | pwntools 4.15.0, pyelftools 0.33, Unicorn 2.1.2 (held: pwntools excludes 2.1.3/2.1.4), pwndbg 2026.09.15 |
 | Firmware | binwalk (built from source), unblob + extractors (`debugfs`, 7z, squashfs, cpio, dtc, lz4/lzop/lzip, cabextract, ...) | binwalk 3.1.0, unblob 26.6.4 |
 | Packets / signals | tshark + capinfos, tcpdump, sigrok-cli + libsigrokdecode | TShark 4.2.2, sigrok-cli 0.7.2 |

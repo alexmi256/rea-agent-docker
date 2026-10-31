@@ -16,7 +16,7 @@ the all-engines service `rea-agent`; swap in your service name
 | ----------------- | --------------------------------------------------------------------------------- | ----- | ----- |
 | **Ghidra 12.1.4** | x86/x86-64, 16-bit x86 (DOS MZ/COM), ARM/Thumb (32/64), MIPS (32/64, LE/BE, micro), PowerPC, RISC-V, SuperH, 6502/65816, Z80, 68000, Atmel AVR, MSP430, Tricore, ... | The broad engine. The native decompiler for the host (`linux_x86_64`) is shipped and is what REA requires. | `all`, `ghidra` |
 | **IDA Pro/Home**  | 60+ processor modules depending on licence tier                                    | Only via your own IDA + MCP registration. IDA **Free** = x86/x86-64 only, cloud decompiler, no idalib. | `all`, `ida` (BYO) |
-| **Hopper 6.6.0**  | x86/x86-64, ARM/ARM64 (incl. Mach-O, dylibs), and the container formats of Apple platforms | Weaker on MIPS/PPC/RISC-V. macOS `.app`/FAT binaries and FAT64 are handled by REA's Hopper loader preparation. 6.6.0 is the build the vendor's signed release feed currently authenticates, which is the only Linux build REA 6.6.0+ admits. | `all`, `hopper` |
+| **Hopper 6.6.1**  | x86/x86-64, ARM/ARM64 (incl. Mach-O, dylibs), and the container formats of Apple platforms | Weaker on MIPS/PPC/RISC-V. macOS `.app`/FAT binaries and FAT64 are handled by REA's Hopper loader preparation. 6.6.1 is the build the vendor's signed release feed currently authenticates, which is the only Linux build REA 6.6.0+ admits. | `all`, `hopper` |
 
 Practical consequence: **Ghidra is the default** for anything unusual. REA's
 own docs cover the pinned profiles for MIPS (`MIPS:<LE|BE>:32:default`),

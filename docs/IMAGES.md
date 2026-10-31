@@ -188,10 +188,10 @@ minority of it. Measured on this project's build host:
 
 | Image | Size (`docker image inspect .Size`) |
 | --- | --- |
-| `rea-agent` (Ghidra + Hopper) | 8.64 GiB — 9,280,685,252 bytes |
-| `rea-agent-ghidra` | 8.52 GiB — 9,152,776,745 bytes |
-| `rea-agent-hopper` | 7.80 GiB — 8,374,793,765 bytes |
-| `rea-agent-ida` | 7.68 GiB — 8,246,885,231 bytes |
+| `rea-agent` (Ghidra + Hopper) | 8.64 GiB — 9,281,121,905 bytes |
+| `rea-agent-ghidra` | 8.52 GiB — 9,153,212,432 bytes |
+| `rea-agent-hopper` | 7.80 GiB — 8,375,230,062 bytes |
+| `rea-agent-ida` | 7.68 GiB — 8,247,320,521 bytes |
 
 Measured with `make sizes` on this build host (amd64); the byte counts move by a
 few tens of KB between rebuilds even with identical inputs (layer timestamps), so

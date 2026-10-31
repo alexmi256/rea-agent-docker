@@ -25,7 +25,7 @@
 #
 # (2) is the one that matters for the engine and helper tools. REA 6.8.0 admits
 # Ghidra 12.1.4, the Linux Hopper demo the publisher-signed vendor feed currently
-# offers (Hopper 6.6.0 - the fixed launcher-digest allowlist is gone), Binwalk
+# offers (Hopper 6.6.1 - the fixed launcher-digest allowlist is gone), Binwalk
 # 3.1.x, Unblob 26.6.x, WABT 1.0.42, sigrok-cli 0.7.2, TShark 4.x,
 # jadx-headless-mcp 0.7.1, pwntools 4.15.0, Wakaru ^1.13.0 - and it refuses
 # builds that do not match (Hopper by the feed's authenticated launcher digest,
