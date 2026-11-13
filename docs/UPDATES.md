@@ -174,11 +174,19 @@ anything reproducible should pin the version tag (see `docs/IMAGES.md`).
 
 ## B. Engines
 
-### Ghidra (exact version)
+### Ghidra (verified build, plus a newer-compatible line)
 
 REA's adapter is verified against one build (`SUPPORTED_GHIDRA_VERSION` in
-`src/ghidra/GhidraReleasePolicy.ts`), and a different one reports
-`config_drift` while everything still looks installed.
+`src/ghidra/GhidraReleasePolicy.ts`). Since 6.9.0 that file no longer refuses a
+newer build outright: a release on the same major with a minor `>=` the verified
+one is admitted as **compatible** and the session carries an unverified-build
+limitation that reports the observed version. Below the verified minor (or on a
+different major) it is `unsupported`, and an exact match is `verified`.
+
+We pin the **verified build**, because that is the admission REA actually
+exercised; moving to a newer 12.x buys nothing and attaches a limitation to every
+session. So the row stays `OUTDATED` (non-failing) while upstream publishes 12.2,
+and a bump to it only happens if REA's verified build moves.
 
 ```bash
 make check-updates --only ghidra       # compares pin, upstream and REA's version
@@ -435,7 +443,15 @@ passes when it cannot see upstream is worse than no check.
   that are deliberately version-less (Google Chrome's `google-chrome.deb`, "always
   current stable") are the exception, not the rule.
 * **`config_drift` from `rea doctor` is not an install failure.** It usually
-  means the engine build is newer than the admitted one.
+  means the engine build is newer than the admitted one. Since 6.9.0 a newer
+  Ghidra on the verified major is *compatible* (reported, with an
+  unverified-build limitation) rather than refused - read `doctor`'s detail
+  before treating either state as breakage.
+* **An env flag can change its accepted spelling.** 6.9.0's Chromium sandbox
+  gate compares `REA_BROWSER_NO_SANDBOX` to the literal `true`; the `1` that
+  worked before now leaves the sandbox on and the browser dies in the container.
+  Re-read the release's own source for a flag's parser before trusting an old
+  value.
 * **A Hopper version number proves nothing** — the gate is the launcher digest
   the vendor's signed feed authenticates for the *current* release, so re-pinning
   the package is only half the bump: `HOPPER_LAUNCHER_SHA256` and the retained

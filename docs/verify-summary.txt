@@ -2,12 +2,12 @@
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 rea-agent verification
-run:       20261025T093139Z
-date:      2026-10-25T09:43:41Z
-image:     ghcr.io/alexmi256/rea-agent:6.8.0-linux-amd64
+run:       20261113T095627Z
+date:      2026-11-13T10:08:44Z
+image:     ghcr.io/alexmi256/rea-agent:6.9.0-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
-node:      v24.22.1
-rea:       6.8.0
+node:      v24.22.3
+rea:       6.9.0
 passed:    121
 failed:    0
 skipped:   3
@@ -26,21 +26,30 @@ Interpretation of the 3 skips (all conditional, none an image defect):
       Bring-your-own commercial engines; skipped because no registration was
       configured for this run.
 
-The counts move by exactly one per image against the 6.7.0 sweep - `all`
-121/0/3, `ghidra` 109/0/8, `hopper` 102/0/7, `ida` 94/0/11 - because this bump
-added one check rather than one capability: REA 6.8.0 narrowed `extract-artifact`
-to a single positional path (it chooses the destination itself and refuses a
-second positional), so the old "exit 0" check was replaced by a JSON assertion
-on the extraction plus a check that the reported files exist under the reported
-`output_root`. That is one check more and a stronger claim.
+The counts are unchanged against the 6.8.0 sweep - `all` 121/0/3, `ghidra`
+109/0/8, `hopper` 102/0/7, `ida` 94/0/11 - which is what a REA release that adds
+capability but no new tool requirement looks like from this harness. REA 6.9.0
+adds desktop build computers, more shipped-artifact formats (UnityFS, Godot PCK,
+Zstandard ZIP members, Intel HEX/S-record/uImage/FIT/ESP-flash/UF2/DfuSe
+firmware), offline NTFS journal and V8 code-cache inspection, and OpenAPI/GraphQL
+inventory - all parsed by REA itself, so the image needs no new helper, and the
+checker reports 0 actionable and 0 unverifiable rows against the new release.
 
-What the 6.8.0 run establishes beyond the 6.7.0 round: the image runs on
-Node 24.22.1, which is the new floor for the 24.x line (`^22.23.4 || ^24.22.1 ||
->=26.12.1`; 24.22.0 - fine for 6.7.0 - is refused outright); the catalog is now
-229 MCP tools (bundled skill v49, up from v42/207); and no engine admission
-moved - Ghidra is still 12.1.4/Java 21 and Hopper is still the vendor feed's
-6.6.0 launcher `b2271008...`, which the harness re-proves from the retained
-signed evidence on every Hopper image.
+What the 6.9.0 run establishes beyond the 6.8.0 round: the image runs on Node
+24.22.3 (the 6.8.0 engines.node range is unchanged, so 24.22.1 was still legal -
+this is the current patch on that line, not a new floor); the catalog is now
+255 MCP tools (bundled skill v62, up from v49/229, which also added a
+`desktop-build` reference); and no engine or helper admission moved - Ghidra is
+still the verified build 12.1.4/Java 21 and Hopper is still the vendor feed's
+6.6.2 demo (launcher 226800f1...), re-proved on every Hopper image from the
+retained signed evidence.
+
+Two 6.9.0 changes did have to be fixed before this sweep could be green, and
+both are recorded in docs/VERIFICATION.md: the Chromium sandbox gate now demands
+the literal `REA_BROWSER_NO_SANDBOX=true` (the old `1` left the sandbox on and
+killed the Playwright launch inside the container), and the Wakaru recovery guide
+moved to docs/guides/javascript/, so the checker reads a candidate list of paths
+instead of one hardcoded one.
 
 Verified in this run: Ghidra analyze/function/decompile/instructions (x86-64),
 import+search across AArch64/ARMv7/MIPS32 BE+LE/RISC-V64/PowerPC/PE32+, AArch64
@@ -52,6 +61,6 @@ probe, firmware regions + extraction, artifact inspect/extract with containment
 and cleanup verified, HAR + live mitmdump capture, Chrome CDP
 target/page/screenshot, Playwright launch->click->DOM, tshark pcap fields/summary,
 sigrok decoder search + VCD UART decode, PTY process capture, adb/apktool/JADX,
-frida binding + frida device inventory, MCP stdio handshake (229 tools) +
+frida binding + frida device inventory, MCP stdio handshake (255 tools) +
 engine-free tools/call + Ghidra open_binary/analyze_function/close_binary, and
 the Streamable HTTP bridge.

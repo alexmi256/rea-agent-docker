@@ -34,10 +34,10 @@ FROM ubuntu:24.04 AS rea-agent
 ARG DEBIAN_FRONTEND=noninteractive
 
 # --- pinned upstream versions ------------------------------------------------
-ARG REA_VERSION=6.8.0
-# REA 6.8.0's engines.node is ^22.23.4 || ^24.22.1 || >=26.12.1, so 24.22.0 -
-# fine for 6.7.0 - is now *refused*. The runtime has to move with it.
-ARG NODE_VERSION=24.22.1
+ARG REA_VERSION=6.9.0
+# REA 6.9.0 keeps 6.8.0's engines.node range (^22.23.4 || ^24.22.1 || >=26.12.1),
+# so the runtime stays on the 24.x line; 24.22.3 is the current patch there.
+ARG NODE_VERSION=24.22.3
 # REA declares frida as an optional dependency (JS instrumentation). npm 11
 # blocks package install scripts by default, so frida's native binding is
 # installed explicitly with --allow-scripts and linked into REA's tree.
@@ -358,8 +358,13 @@ RUN set -eux; binwalk --version; tshark --version | head -1; which capinfos
 # =============================================================================
 # 12. Browser (websites / Electron renderers) + Playwright Chromium
 # =============================================================================
+# REA 6.9.0 launches Chromium *with* its sandbox unless REA_BROWSER_NO_SANDBOX is
+# the literal string "true" (ChromiumSandbox.js compares `!== "true"`), and a
+# container cannot create the PID namespace the zygote needs: the launch dies
+# with "Failed to move to new namespace ... Operation not permitted". A numeric 1
+# is not accepted - keep this spelling and mirror it in both compose files.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
-    REA_BROWSER_NO_SANDBOX=1
+    REA_BROWSER_NO_SANDBOX=true
 RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
     set -eux; \
     if [ "${INSTALL_CHROME}" = "1" ]; then \

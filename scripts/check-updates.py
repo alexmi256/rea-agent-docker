@@ -783,24 +783,41 @@ def check_tools(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmission
 def check_wakaru_digest(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissions) -> list[Row]:
     """Our Wakaru pin must be the asset REA audited, byte for byte.
 
-    REA fingerprints the executed binary and docs/javascript-recovery.md records
-    the SHA-256 of the build it verified, so a different asset would be running
-    bytes REA never audited even though the version number matches.
+    REA fingerprints the executed binary and its recovery guide records the
+    SHA-256 of the build it verified, so a different asset would be running bytes
+    REA never audited even though the version number matches.
+
+    The guide moved to docs/guides/javascript/javascript-recovery.md in 6.9.0
+    (the remediation string names the new anchor). Read a list of candidate paths
+    so a pin on either side of such a move still resolves: a single hardcoded
+    path turns the row into `unknown` - or worse, `ok` with nothing verified.
     """
     pinned = pins.get("WAKARU_LINUX_X64_SHA256", "")
-    url = REA_RAW.format(repo=REA_REPO, version=admissions.version,
-                         path="docs/javascript-recovery.md")
+    candidates = [
+        "docs/guides/javascript/javascript-recovery.md",
+        "docs/javascript-recovery.md",
+    ]
+    urls = [REA_RAW.format(repo=REA_REPO, version=admissions.version, path=p)
+            for p in candidates]
     row = Row("wakaru-digest", "wakaru binary digest", "REA-admitted tools", "ok",
-              pinned=(pinned[:12] + "…") if pinned else None, source=url)
+              pinned=(pinned[:12] + "…") if pinned else None, source=urls[0])
     if not pinned:
         row.status = "missing"
         row.note = "no WAKARU_LINUX_X64_SHA256 pin, so the fetched asset is unverified"
         row.hint = "pin the digest REA documents for the verified release"
         return [row]
-    try:
-        doc = fetcher.text(url)
-    except Exception as exc:  # noqa: BLE001
-        return [unknowable(row, exc)]
+    doc = None
+    last_error: Exception | None = None
+    for url in urls:
+        try:
+            doc = fetcher.text(url)
+            row.source = url
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+    if doc is None:
+        return [unknowable(row, RuntimeError(
+            f"no REA wakaru guide at any known path ({'; '.join(urls)}): {last_error}"))]
     match = re.search(r"SHA-256\s*`([0-9a-f]{64})`", doc)
     if not match:
         return [unknowable(row, RuntimeError("no SHA-256 in REA's javascript-recovery doc"))]

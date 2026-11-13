@@ -3,7 +3,7 @@
 Commands:
 
 ```bash
-scripts/verify.sh --image rea-agent-ghidra:6.8.0-linux-amd64   # one engine image
+scripts/verify.sh --image rea-agent-ghidra:6.9.0-linux-amd64   # one engine image
 scripts/verify-all-engines.sh                                  # all four, one table
 make verify ENGINE=hopper                                      # same, via make
 ```
@@ -41,13 +41,13 @@ implies — that is the point of the split:
 
 | Engine | Image | Passed | Failed | Skipped | Notable skips |
 | ------ | ----- | -----: | -----: | ------: | ------------- |
-| `all` | `rea-agent` | 107 | 0 | 3 | IDA/JEB (no licence configured), Apple-platform plist routing |
-| `ghidra` | `rea-agent-ghidra` | 95 | 0 | 8 | as above **+ the Hopper checks** (not in this image) |
-| `hopper` | `rea-agent-hopper` | 88 | 0 | 7 | as above **+ the Ghidra multi-arch checks** (not in this image) |
-| `ida` | `rea-agent-ida` | 80 | 0 | 11 | **all native analysis** (no engine bundled — register IDA to enable it), plus the `all` column's skips |
+| `all` | `rea-agent` | 121 | 0 | 3 | IDA/JEB (no licence configured), Apple-platform plist routing |
+| `ghidra` | `rea-agent-ghidra` | 109 | 0 | 8 | as above **+ the Hopper checks** (not in this image) |
+| `hopper` | `rea-agent-hopper` | 102 | 0 | 7 | as above **+ the Ghidra multi-arch checks** (not in this image) |
+| `ida` | `rea-agent-ida` | 94 | 0 | 11 | **all native analysis** (no engine bundled — register IDA to enable it), plus the `all` column's skips |
 
-Run ids: `20261014T203245Z` (all), `20261014T204424Z` (ghidra),
-`20261014T205559Z` (hopper), `20261014T205739Z` (ida) — full per-check logs in
+Run ids for the 6.9.0 round: `20261113T095627Z` (all), `20261113T100847Z` (ghidra),
+`20261113T102052Z` (hopper), `20261113T102258Z` (ida) — full per-check logs in
 `work/verify-reports/<run-id>/logs/`, summarised in
 [`docs/verify-engines.txt`](verify-engines.txt). Every image exited 0.
 
@@ -76,9 +76,9 @@ image after the engine split):
   `ida` → shallow `healthy`, deep reports
   `unhealthy: engine=ida but REA_IDA_MCP_CONFIG is not set`, which is the correct
   answer for an unconfigured, engine-less image.
-* `rea mcp` answers MCP `initialize` (server `rea 6.8.0`, protocol
+* `rea mcp` answers MCP `initialize` (server `rea 6.9.0`, protocol
   `2025-06-18`, capabilities tools/completions/prompts) and advertises
-  **229 tools** on every image (the catalog does not depend on the engine).
+  **255 tools** on every image (the catalog does not depend on the engine).
 * `ilspycmd 8.2.0.7535` runs (net6.0 app; the image sets
   `DOTNET_ROLL_FORWARD=Major`).
 * frida binding: `getLocalDevice()` → "Local System".
@@ -115,6 +115,71 @@ harness runs them for real rather than skipping:
 Their tooling (WABT 1.0.42, Node's built-in SQLite, TShark, sigrok-cli 0.7.2,
 frida 17.23.2) was already in the image, so no dependency changed for this —
 only `REA_VERSION`.
+
+## REA 6.9.0 (2026-11-13)
+
+`rea-agents` moved 6.8.0 → **6.9.0** (2026-11-12; npm and the GitHub release
+agree), so `make check-updates` reported `NEW REA` and the whole pin set was
+re-derived from that release instead of being assumed. It ends at **0
+actionable / 0 unverifiable**, with the six remaining `OUTDATED` rows being
+upstream-only newer releases that wait for the next REA round by policy.
+
+**What moved.** `NODE_VERSION` 24.22.1 → **24.22.3**. 6.9.0 keeps 6.8.0's
+`engines.node` (`^22.23.4 || ^24.22.1 || >=26.12.1`), so this is the current patch
+on an already-admitted line rather than a new floor — 24.22.1 would still start.
+Nothing else pinned required a move: Ghidra is still the verified **12.1.4** /
+Java 21, Hopper is still the vendor feed's **6.6.2** demo (`226800f1…`), and
+unblob 26.6.4, binwalk 3.1.0, WABT 1.0.42, pwntools 4.15.0, jadx-headless-mcp
+0.7.1 and Wakaru 1.14.0 (`664fa067…`) are all still what the release admits.
+
+**The catalog grew: 229 → 255 MCP tools, bundled skill v49 → v62.** Read from the
+shipped `dist/mcp-catalog.json` and from the image's own
+`/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything/SKILL.md`
+(`version: "62"`, `tool_count: 255`), not from the release notes. v62 also adds a
+`desktop-build` reference. The installed client-side skill was resynced to the
+image's copy with this repository's licence/keygen extension re-applied on top.
+
+**Two 6.9.0 changes broke this image, and both were the release's own doing.**
+
+* **Chromium keeps its sandbox.** 6.9.0 launches REA's browser *with* the
+  sandbox unless `REA_BROWSER_NO_SANDBOX` is the **literal string `true`**
+  (`ChromiumSandbox.js`: `environment[...] !== "true"`). The image shipped `1`,
+  which is not that string, so a container launch died with
+  `Failed to move to new namespace … Operation not permitted` / `Zygote process
+  exited prematurely` and the Playwright scenario failed (120/1/3 on the first
+  sweep). Fixed in the `Dockerfile` **and** both compose files (they set the
+  variable too, so an image-only fix would have been overridden), then re-proved
+  with the capture phase alone (14 passed / 0 failed) before the full sweep.
+* **The Wakaru admission moved.** 6.9.0's remediation string points at
+  `docs/guides/javascript/javascript-recovery.md`; the checker read
+  `docs/javascript-recovery.md`, got a 404 and reported the digest row as
+  `unknown` — the honest failure, not a silent `ok`. It now reads a **candidate
+  list** of paths (so a pin on either side of a move resolves) and re-verifies
+  `664fa067…` as the digest REA documents for Wakaru 1.14.0.
+
+Also noted but not a break: `SUPPORTED_GHIDRA_VERSION` still 12.1.4, but
+`ghidraReleaseCompatibility` now admits a same-major release with a **higher
+minor** as *compatible* (reported on the provider identity with an
+unverified-build limitation) instead of refusing it. We keep pinning the verified
+build; the Ghidra row therefore stays `OUTDATED` against upstream 12.2 without
+being actionable, and `docs/UPDATES.md` §B records the new semantics. Likewise
+newly advertised but absent on purpose: `Kuna` (caller-supplied provider) and the
+BYO engines remain the accepted gaps.
+
+**Result — full sweep, all four images, 0 failures:**
+
+| Engine | Passed | Failed | Skipped | Run |
+| ------ | -----: | -----: | ------: | --- |
+| `all` | 121 | 0 | 3 | `20261113T095627Z` |
+| `ghidra` | 109 | 0 | 8 | `20261113T100847Z` |
+| `hopper` | 102 | 0 | 7 | `20261113T102052Z` |
+| `ida` | 94 | 0 | 11 | `20261113T102258Z` |
+
+Identical to the 6.8.0 round on every image, which is the expected shape for a
+release that adds capability inside REA (desktop build computers, UnityFS/Godot/
+Zstandard/instrument-firmware/NTFS-journal/V8-code-cache readers, OpenAPI and
+GraphQL inventory, Playwright trace import) rather than adding a helper tool the
+image must supply. Raw logs: [`docs/verify-engines.txt`](verify-engines.txt).
 
 ## Hopper feed re-pin: 6.6.2 (2026-11-07, no REA move)
 
@@ -291,10 +356,12 @@ frida 17.25.0, uv 0.13.6, supergateway 4.2.1, mitmproxy 12.3.1, pwndbg
 | **Local per-engine sweep, dependency round (2026-10-15)** | all **120/0/3** · ghidra **108/0/8** · hopper **101/0/7** · ida **93/0/11** — 0 failures on all four, exit 0 on every image; full log in [`docs/verify-engines.txt`](verify-engines.txt). This is the round that bumped Node to 24.22.0, frida to 17.23.3, uv to 0.13.1, supergateway to 4.2.0 and added **Wakaru 1.14.0**, so the count includes 13 new checks: five assert REA's admission rules for the Wakaru binary (absolute path, readable+executable, the `wakaru <semver>` banner, the audited SHA-256, util-linux prlimit) and eight run the operation itself — a minified bundle fixture is recovered, the Evidence is asserted on schema fields (provider `wakaru`, `status: complete`, `failed: 0`, module `decompiled`, and the fingerprinted digest **`664fa067…` proving REA ran the audited asset**), the published module file is checked, and the recovered tree is then analysed with `analyze-javascript-application`. |
 | **Local per-engine sweep, Hopper feed re-pin (2026-11-07)** | all **121/0/3** · ghidra **109/0/8** · hopper **102/0/7** · ida **94/0/11** — 0 failures on all four, exit 0 on every image; runs `20261107T091717Z` / `20261107T092924Z` / `20261107T094115Z` / `20261107T094312Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). `rea-agents` 6.8.0 moved nothing again — the trigger was the vendor's signed Hopper feed advancing **6.6.1 → 6.6.2** (launcher `226800f1…`) on 2026-11-06, so the previous pin was refused at run time and by the build layer. The new pin was verified against the **package** rather than the feed's claim: the `.deb`'s detached PGP signature verifies under the vendor key `7C2D73BA…099B1BCD` (REA's primary fingerprint), and `opt/hopper/bin/Hopper` hashed out of the unpacked package equals the feed's `main_exe_hash`. Counts are **identical to the 6.6.1 round on every image**; `doctor` reports `6.6.2` with `source: signed_package_cache`. |
 | **Local per-engine sweep, Hopper feed re-pin (2026-10-31)** | all **121/0/3** · ghidra **109/0/8** · hopper **102/0/7** · ida **94/0/11** — 0 failures on all four, exit 0 on every image; runs `20261031T092059Z` / `20261031T093304Z` / `20261031T094453Z` / `20261031T094650Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). No REA move this time — `rea-agents` 6.8.0 was still the newest release on npm and GitHub — the trigger was the vendor's signed Hopper feed advancing to **6.6.1** (launcher `74b51599…`), which the previous pin (6.6.0, `b2271008…`) could no longer satisfy: REA refuses a launcher that is not the feed's current `main_exe_hash`, and the build layer refuses when the feed's row no longer matches the pin. Counts are **identical to the 6.8.0 round on every image**, the expected result for a package swap that adds no capability; the Hopper checks themselves are what moved (the launcher-digest check prints `74b51599…`, `doctor` reports `6.6.1` from `signed_package_cache`). |
-| **Local per-engine sweep, REA 6.8.0 (this bump)** | all **121/0/3** · ghidra **109/0/8** · hopper **102/0/7** · ida **94/0/11** — 0 failures on all four, exit 0 on every image; runs `20261025T093139Z` / `20261025T094344Z` / `20261025T095536Z` / `20261025T095733Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). Every image carries **one more check** than the 6.7.0 round, and it is an addition rather than a capability: `extract-artifact` lost its second positional in 6.8.0, so the old exit-status check became a JSON assertion on the extraction plus one that the reported files exist under the reported `output_root`. Node moved to 24.22.1 (6.8.0's range refuses 24.22.0), the catalog grew 207 → 229 tools (skill v42 → v49), and no engine admission moved. |
+| **Local per-engine sweep, REA 6.9.0 (this bump)** | all **121/0/3** · ghidra **109/0/8** · hopper **102/0/7** · ida **94/0/11** — 0 failures on all four, exit 0 on every image; runs `20261113T095627Z` / `20261113T100847Z` / `20261113T102052Z` / `20261113T102258Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). `rea-agents` moved **6.8.0 → 6.9.0** and Node moved 24.22.1 → 24.22.3 (same `engines.node` range); the catalog grew **229 → 255** tools (bundled skill v49 → v62), and no engine or helper admission moved. The first sweep of the round failed exactly one check on the `all` image — `playwright launch + click + DOM capture` — because 6.9.0 keeps Chromium's sandbox unless `REA_BROWSER_NO_SANDBOX` is the literal `true` (the image passed `1`), so the launch died with `Failed to move to new namespace … Operation not permitted`; fixed in the Dockerfile and both compose overlays and re-proved with the capture phase alone (14/0) before re-running the sweep. The Wakaru digest gate also moved with REA's docs (`docs/javascript-recovery.md` → `docs/guides/javascript/javascript-recovery.md`), which the checker now reads as a candidate list. |
+| **Local per-engine sweep, REA 6.8.0** | all **121/0/3** · ghidra **109/0/8** · hopper **102/0/7** · ida **94/0/11** — 0 failures on all four, exit 0 on every image; runs `20261025T093139Z` / `20261025T094344Z` / `20261025T095536Z` / `20261025T095733Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). Every image carries **one more check** than the 6.7.0 round, and it is an addition rather than a capability: `extract-artifact` lost its second positional in 6.8.0, so the old exit-status check became a JSON assertion on the extraction plus one that the reported files exist under the reported `output_root`. Node moved to 24.22.1 (6.8.0's range refuses 24.22.0), the catalog grew 207 → 229 tools (skill v42 → v49), and no engine admission moved. |
 | **Local per-engine sweep, REA 6.7.0** | all **120/0/3** · ghidra **108/0/8** · hopper **101/0/7** · ida **93/0/11** — 0 failures on all four, exit 0 on every image; runs `20261019T014730Z` / `20261019T015922Z` / `20261019T021101Z` / `20261019T021249Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). Counts are **identical to the previous round** on every image, which is the expected result: 6.6.0/6.7.0 added no tool family and removed none. The bump's real work was a change of gate — Hopper moved from a fixed launcher-digest allowlist to the vendor's signed release feed (so the pinned 6.4.2 build is refused outright and the image now ships 6.6.0 plus its retained evidence), the Ghidra policy source was renamed, and both had to be re-derived in `scripts/check-updates.py`, which is back to `0 actionable / 0 pending / 0 unknown`. frida moved to 17.24.1. |
 | **Build failures this round caught** | Two, both real and both fixed rather than worked around: the Node layer died with `sha256sum: no properly formatted checksum lines found` because `/var/cache/rea-dl` held the *previous* version's `SHASUMS256.txt` under a version-less name (the cached filename is now version-qualified, and the stale file was deliberately left in place to prove the fix, not the cache clean); and `pip` refused `unicorn==2.1.4` with `ResolutionImpossible` because pwntools 4.15.0 declares `unicorn !=2.1.3, !=2.1.4` — so unicorn stays at 2.1.2 and the checker now reports it as `held on 2.1.2: <reason>` instead of as an available update. Neither reached GHCR: the publish step runs only after verification. |
 
 The committed summary of the last full single-image run is in
 [`docs/verify-summary.txt`](verify-summary.txt); the per-engine table from the
 final sweep is in [`docs/verify-engines.txt`](verify-engines.txt).
+
