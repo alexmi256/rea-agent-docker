@@ -34,16 +34,16 @@ FROM ubuntu:24.04 AS rea-agent
 ARG DEBIAN_FRONTEND=noninteractive
 
 # --- pinned upstream versions ------------------------------------------------
-ARG REA_VERSION=6.9.0
-# REA 6.9.0 keeps 6.8.0's engines.node range (^22.23.4 || ^24.22.1 || >=26.12.1),
+ARG REA_VERSION=6.10.1
+# REA 6.10 keeps 6.9's engines.node range (^22.23.4 || ^24.22.1 || >=26.12.1),
 # so the runtime stays on the 24.x line; 24.22.3 is the current patch there.
 ARG NODE_VERSION=24.22.3
 # REA declares frida as an optional dependency (JS instrumentation). npm 11
 # blocks package install scripts by default, so frida's native binding is
 # installed explicitly with --allow-scripts and linked into REA's tree.
 ARG FRIDA_VERSION=17.24.1
-ARG GHIDRA_VERSION=12.1.4
-ARG GHIDRA_ZIP=ghidra_12.1.4_PUBLIC_20260921.zip
+ARG GHIDRA_VERSION=12.2
+ARG GHIDRA_ZIP=ghidra_12.2_PUBLIC_20261016.zip
 ARG GHIDRA_SHA256=
 ARG GHIDRA_BASE_URL=https://github.com/NationalSecurityAgency/ghidra/releases/download
 # Hopper: REA 6.6.0 replaced the fixed launcher-digest allowlist with the
@@ -149,7 +149,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       libcups2t64 libdrm2 libpango-1.0-0 libcairo2 libasound2t64 \
       fontconfig fonts-liberation2 fonts-dejavu-core \
       xvfb xauth x11-utils \
-      openjdk-21-jdk-headless \
+      openjdk-25-jdk-headless \
       yara qemu-user-static binfmt-support \
       openssl libssl-dev zlib1g-dev liblzma-dev \
     ; \
@@ -186,7 +186,7 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     node -e 'const f=require("frida"); console.log("frida binding:", require.resolve("frida")); f.getLocalDevice().then(d=>console.log("frida local device:", d.name)).catch(e=>{console.error("frida error:", e.message);process.exit(1);})'
 
 # =============================================================================
-# 4. Ghidra 12.1.x + JDK 21  (the multi-architecture engine)
+# 4. Ghidra 12.2 + JDK 25  (the multi-architecture engine)
 #    Ships decompilers/languages for x86, x86-64, ARM/Thumb, AArch64, MIPS,
 #    PowerPC, RISC-V, SuperH, 6502, Z80, 16-bit DOS, ... -> this is what makes
 #    Hopper/IDA's narrower architecture coverage a non-issue.
@@ -194,7 +194,7 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
 # =============================================================================
 # JAVA_HOME is engine-independent: jadx, apktool and ilspycmd all need a JDK.
 # The Ghidra install itself lives in the engine section at the end of the file.
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
 
 # =============================================================================
 # 5. Hopper Disassembler (Linux x64) - engine section at the end of the file
@@ -358,7 +358,7 @@ RUN set -eux; binwalk --version; tshark --version | head -1; which capinfos
 # =============================================================================
 # 12. Browser (websites / Electron renderers) + Playwright Chromium
 # =============================================================================
-# REA 6.9.0 launches Chromium *with* its sandbox unless REA_BROWSER_NO_SANDBOX is
+# REA 6.9.0 and later launch Chromium *with* its sandbox unless REA_BROWSER_NO_SANDBOX is
 # the literal string "true" (ChromiumSandbox.js compares `!== "true"`), and a
 # container cannot create the PID namespace the zygote needs: the launch dies
 # with "Failed to move to new namespace ... Operation not permitted". A numeric 1
@@ -494,9 +494,9 @@ RUN set -eux; \
 # =============================================================================
 ENV REA_ENGINE=${REA_ENGINE}
 
-# --- 17a. Ghidra 12.1.x (REA_ENGINE=all|ghidra) -----------------------------
+# --- 17a. Ghidra 12.2 (REA_ENGINE=all|ghidra) -----------------------------
 # Multi-architecture engine: x86, x86-64, ARM/Thumb, AArch64, MIPS, PowerPC,
-# RISC-V, SuperH, 6502, Z80, 16-bit DOS, ... JDK 21 is installed above and is
+# RISC-V, SuperH, 6502, Z80, 16-bit DOS, ... JDK 25 is installed above and is
 # present in every image (jadx, apktool and ilspycmd need it too).
 RUN --mount=type=cache,target=/var/cache/rea-dl,sharing=locked \
     set -eux; \
@@ -655,7 +655,7 @@ RUN set -eux; \
     case "${REA_ENGINE}" in \
       all|ghidra) printf '%s\n' \
         "export GHIDRA_INSTALL_DIR=/opt/ghidra" \
-        "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64" >> /usr/local/share/rea/engine.env ;; \
+        "export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64" >> /usr/local/share/rea/engine.env ;; \
     esac; \
     case "${REA_ENGINE}" in \
       ghidra) printf '%s\n' "export REA_ANALYSIS_PROVIDER=ghidra" >> /usr/local/share/rea/engine.env ;; \

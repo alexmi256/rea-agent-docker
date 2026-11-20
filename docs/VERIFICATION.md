@@ -3,7 +3,7 @@
 Commands:
 
 ```bash
-scripts/verify.sh --image rea-agent-ghidra:6.9.0-linux-amd64   # one engine image
+scripts/verify.sh --image rea-agent-ghidra:6.10.1-linux-amd64   # one engine image
 scripts/verify-all-engines.sh                                  # all four, one table
 make verify ENGINE=hopper                                      # same, via make
 ```
@@ -46,8 +46,8 @@ implies — that is the point of the split:
 | `hopper` | `rea-agent-hopper` | 102 | 0 | 7 | as above **+ the Ghidra multi-arch checks** (not in this image) |
 | `ida` | `rea-agent-ida` | 94 | 0 | 11 | **all native analysis** (no engine bundled — register IDA to enable it), plus the `all` column's skips |
 
-Run ids for the 6.9.0 round: `20261113T095627Z` (all), `20261113T100847Z` (ghidra),
-`20261113T102052Z` (hopper), `20261113T102258Z` (ida) — full per-check logs in
+Run ids for the 6.10.1 round: `20261120T091917Z` (all), `20261120T093113Z` (ghidra),
+`20261120T094300Z` (hopper), `20261120T094455Z` (ida) — full per-check logs in
 `work/verify-reports/<run-id>/logs/`, summarised in
 [`docs/verify-engines.txt`](verify-engines.txt). Every image exited 0.
 
@@ -61,7 +61,7 @@ image after the engine split):
 
 * `rea doctor --provider ghidra --json` → `healthy: true` on `all` and `ghidra`
   (`ghidra-native_decompiler`: "elf x86_64, which matches linux/x64";
-  `ghidra-java` accepts JDK 21 64-bit).
+  `ghidra-java` accepts a 64-bit JDK 25 or newer).
 * `rea doctor --provider hopper --json` → `healthy: true` on `all` and `hopper`;
   `hopper-version` healthy (the launcher SHA-256 is the one the vendor's signed
   release feed authenticates - `226800f1…` for the shipped Hopper 6.6.2 demo, and
@@ -76,9 +76,9 @@ image after the engine split):
   `ida` → shallow `healthy`, deep reports
   `unhealthy: engine=ida but REA_IDA_MCP_CONFIG is not set`, which is the correct
   answer for an unconfigured, engine-less image.
-* `rea mcp` answers MCP `initialize` (server `rea 6.9.0`, protocol
+* `rea mcp` answers MCP `initialize` (server `rea 6.10.1`, protocol
   `2025-06-18`, capabilities tools/completions/prompts) and advertises
-  **255 tools** on every image (the catalog does not depend on the engine).
+  **263 tools** on every image (the catalog does not depend on the engine).
 * `ilspycmd 8.2.0.7535` runs (net6.0 app; the image sets
   `DOTNET_ROLL_FORWARD=Major`).
 * frida binding: `getLocalDevice()` → "Local System".
@@ -115,6 +115,99 @@ harness runs them for real rather than skipping:
 Their tooling (WABT 1.0.42, Node's built-in SQLite, TShark, sigrok-cli 0.7.2,
 frida 17.23.2) was already in the image, so no dependency changed for this —
 only `REA_VERSION`.
+
+## REA 6.10.1 (2026-11-20)
+
+`rea-agents` moved 6.9.0 → **6.10.1** (6.10.0 at 04:58Z and 6.10.1 at 05:30Z, both
+2026-11-20; 6.10.1 is a single fix — one constant for Kuna's serial job count).
+npm `latest` and the GitHub releases agree, so `make check-updates` reported
+`NEW REA` and the pin set was re-derived from the release rather than assumed. It
+ends at **0 actionable / 0 unverifiable**, with five `OUTDATED` rows that are
+upstream-only newer releases waiting for the next REA round by policy.
+
+**What moved — two admissions, both hard gates.**
+
+* **Ghidra 12.1.4 → 12.2** (`GHIDRA_VERSION` + `GHIDRA_ZIP`
+  `ghidra_12.2_PUBLIC_20261016.zip`). 6.10's `SUPPORTED_GHIDRA_VERSION` is `12.2`
+  and `ADMITTED_GHIDRA_MINOR_FLOOR` refuses anything below it, so the old pin
+  would have been **`unsupported`** rather than the 6.9-era `compatible`. This is
+  the case `docs/UPDATES.md` §B warned about: the row only moves when REA's
+  verified build moves, and here it did.
+* **JDK 21 → 25.** `SUPPORTED_GHIDRA_JAVA_MAJOR` is now `25`, and Ghidra 12.2
+  declares bounds for it. `openjdk-25-jdk-headless` is in noble
+  (25.0.5.1+2-1~24.04.1), so it is still an apt install. Every literal `JAVA_HOME`
+  mirror moved in the same commit: the Dockerfile `ENV`, the Dockerfile's
+  `engine.env` writer, `docker-compose.yml`, `compose.http.yml`, `.env.example`
+  and the gitignored `.env`.
+
+Nothing else pinned required a move: `NODE_VERSION` stays 24.22.3 (`engines.node`
+is unchanged), Hopper is still the vendor feed's 6.6.2 demo (`226800f1…`, the feed
+did not move), and unblob 26.6.4, binwalk 3.1.0, WABT 1.0.42, pwntools 4.15.0,
+jadx-headless-mcp 0.7.1, apktool 2.12.1 and Wakaru 1.14.0 (`664fa067…`) are all
+still what the release admits. Node 24.x remains deliberately behind the newest
+LTS line (26.13.1) because REA's own range and verification are on 24.
+
+**The catalog grew: 255 → 263 MCP tools, bundled skill v62 → v63.** Read from
+`rea doctor --json` in the image (`identity.expected_skill_version`) and from
+`/usr/local/lib/node_modules/rea-agents/skills/reverse-engineer-anything/SKILL.md`
+(`version: "63"`, `tool_count: 263`), not from the release notes. The installed
+client-side skill was resynced to the image's copy: SKILL.md replaced with the
+6.10.1 text and the six shared references 3-way merged (upstream 6.9.0 package as
+base), so this repository's local additions survive — the licence/keygen section
+and its reference, the Android API-recovery pointer, and the longer agent list.
+
+**6.10 is a large breaking release, and none of it needed an image change beyond
+the two admissions above.** The ones that could have bitten:
+
+* **`evidence_format: 2`** and explicit `subject.identity` replacing
+  `subject.digest` / `subject.format` / `subject.architecture`. The harness
+  asserts outcomes (`evidence_id != null`, decompiled text, string match), never
+  the removed fields, so it is unaffected — but every saved Evidence, snapshot,
+  bundle and capture from the 6.9 era must be recreated before `compare_*` uses
+  it. That is a user-side consequence, documented in the release notes.
+* **`rea mcp` / `rea --mcp` only**; `rea <command> --mcp` is gone. The image, both
+  compose files, the Makefile target and the harness already invoke `rea mcp`.
+* **MCP rejects `full` schema profiles**, and an unset
+  `REA_MCP_OUTPUT_SCHEMA_PROFILE` now means `off`. The image sets
+  `REA_MCP_INPUT_SCHEMA_PROFILE=compact` (never `full`) and leaves the output
+  profile unset, which the harness's real `initialize` → `tools/list` handshake
+  proves still yields 263 tools.
+* **IDA attached registrations must say `"protocol": "native"`**, and the removed
+  `ida-pro-mcp` 1.4 `"legacy"` protocol is refused. The image's template
+  (`ida/README.md`) and `scripts/setup-ida-mcp.sh` already emit `native`.
+* **Ghidra/Hopper `analysis_profile.parameters.producer`** replaces the
+  hand-bumped markers. No harness assertion reads those fields.
+* **`inspect-managed-members --detail summary`**: `--evidence-bundle` →
+  `--evidence_output`. Neither the harness nor the docs used the old flag.
+* **Kuna 1.1000** (was 1.0.x): Kuna remains a caller-supplied provider and an
+  accepted gap, so only the remediation string the doctor prints changed.
+
+**Result — full sweep, all four images, 0 failures:**
+
+| Engine | Passed | Failed | Skipped | Run |
+| ------ | -----: | -----: | ------: | --- |
+| `all` | 121 | 0 | 3 | `20261120T091917Z` |
+| `ghidra` | 109 | 0 | 8 | `20261120T093113Z` |
+| `hopper` | 102 | 0 | 7 | `20261120T094300Z` |
+| `ida` | 94 | 0 | 11 | `20261120T094455Z` |
+
+Identical to the 6.9.0 and 6.8.0 rounds on every image — the expected shape for a
+release that adds capability inside REA (UEFI firmware volumes and AMI NVRAM,
+Android boot images and OTA payloads, ELF dependency/DWARF/debug-link readers,
+Maven/Gradle/NuGet metadata, CycloneDX SBOM export) while moving the engine rather
+than asking the image for a new helper tool. In-image spot checks before the
+sweep: Ghidra 12.2 with `ghidra-java` reporting `accepted a 64-bit full JDK 25 or
+newer`, skill v63/263, and only the four documented BYO failures in
+`rea doctor` (hopper, IDA registration, Kuna, skill identity). Raw logs:
+[`docs/verify-engines.txt`](verify-engines.txt).
+
+Also fixed while sweeping the pins: `scripts/check-updates.py`'s JDK row carried a
+literal `openjdk-21` plus a `"21" not in pinned` substring test, and
+`scripts/build.sh` / `image-name.sh` / `verify-all-engines.sh` each defaulted
+`REA_TAG` to `6.9.0-linux-amd64`. Both classes are the same trap — a mirror that
+silently verifies or tags the wrong version — so the JDK row now derives its major
+from the `openjdk-<N>-jdk-headless` package the Dockerfile installs, and the three
+`REA_TAG` defaults moved with the release.
 
 ## REA 6.9.0 (2026-11-13)
 

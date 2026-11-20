@@ -15,7 +15,7 @@ engineering without installing a single tool on the host.
 * **Base:** `ubuntu:24.04` — the distribution REA's Hopper installer and
   Ghidra/JDK bindings are verified against, and the one that resolves every
   pinned helper version from apt.
-* **Engines:** Ghidra 12.1.4 (multi-architecture, the default), Hopper 6.6.2
+* **Engines:** Ghidra 12.2 (multi-architecture, the default), Hopper 6.6.2
   (public demo, headless via Xvfb), IDA Pro/Home/Free (bring your own licence).
 * **Four images, one per engine:** `rea-agent` (Ghidra + Hopper), `rea-agent-ghidra`,
   `rea-agent-hopper`, `rea-agent-ida` (no bundled engine). Same auxiliary
@@ -47,10 +47,10 @@ Images are published to the GitHub Container Registry on every push to `main`:
 
 | Image | Engine |
 | ----- | ------ |
-| `ghcr.io/alexmi256/rea-agent:6.9.0-linux-amd64` | Ghidra + Hopper |
-| `ghcr.io/alexmi256/rea-agent-ghidra:6.9.0-linux-amd64` | Ghidra only |
-| `ghcr.io/alexmi256/rea-agent-hopper:6.9.0-linux-amd64` | Hopper only |
-| `ghcr.io/alexmi256/rea-agent-ida:6.9.0-linux-amd64` | no engine (bring your own IDA) |
+| `ghcr.io/alexmi256/rea-agent:6.10.1-linux-amd64` | Ghidra + Hopper |
+| `ghcr.io/alexmi256/rea-agent-ghidra:6.10.1-linux-amd64` | Ghidra only |
+| `ghcr.io/alexmi256/rea-agent-hopper:6.10.1-linux-amd64` | Hopper only |
+| `ghcr.io/alexmi256/rea-agent-ida:6.10.1-linux-amd64` | no engine (bring your own IDA) |
 
 Each also carries a `:latest` tag. The packages are public — no login, no token,
 just:
@@ -120,8 +120,8 @@ Full walkthrough: [docs/HERMES-MCP.md](docs/HERMES-MCP.md).
 
 | Family | Tools | Pinned |
 | ------ | ----- | ------ |
-| REA | `rea-agents` CLI + MCP server | 6.9.0 (Node 24.22.3) |
-| Native engines | Ghidra + JDK 21, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.1.4, Hopper 6.6.2 |
+| REA | `rea-agents` CLI + MCP server | 6.10.1 (Node 24.22.3) |
+| Native engines | Ghidra + JDK 25, Hopper (demo or licensed), IDA (BYO) | Ghidra 12.2, Hopper 6.6.2 |
 | ELF/core analysis | pwntools + pyelftools + Unicorn in a venv, `gdb` + `gdb-multiarch`, pwndbg | pwntools 4.15.0, pyelftools 0.33, Unicorn 2.1.2 (held: pwntools excludes 2.1.3/2.1.4), pwndbg 2026.09.15 |
 | Firmware | binwalk (built from source), unblob + extractors (`debugfs`, 7z, squashfs, cpio, dtc, lz4/lzop/lzip, cabextract, ...) | binwalk 3.1.0, unblob 26.6.4 |
 | Packets / signals | tshark + capinfos, tcpdump, sigrok-cli + libsigrokdecode | TShark 4.2.2, sigrok-cli 0.7.2 |

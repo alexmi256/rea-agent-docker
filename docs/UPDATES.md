@@ -197,9 +197,11 @@ make build --no-cache                 # the engine layer must rebuild
 docker compose exec rea-agent rea doctor --provider ghidra --json
 ```
 
-The JDK matters too: `SUPPORTED_GHIDRA_JAVA_MAJOR` (21 today) is the major Ghidra
-declares bounds for. We install `openjdk-21-jdk-headless` from apt, so a Java
-*patch* needs nothing but a rebuild.
+The JDK matters too: `SUPPORTED_GHIDRA_JAVA_MAJOR` (25 today) is the major Ghidra
+declares bounds for. We install `openjdk-25-jdk-headless` from apt, so a Java
+*patch* needs nothing but a rebuild — but a *major* move means the literal
+`JAVA_HOME` mirrors in the Dockerfile, `docker-compose.yml`, `compose.http.yml`
+and `.env.example` all move together (`/usr/lib/jvm/java-25-openjdk-amd64`).
 
 ### Hopper (a signed feed, not a version)
 

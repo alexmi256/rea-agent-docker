@@ -9,7 +9,7 @@ keeps its own licence and terms. That installed set is:
 | Component | Licence |
 | --- | --- |
 | Ghidra | Apache-2.0 |
-| OpenJDK 21 | GPL-2.0-with-classpath-exception |
+| OpenJDK 25 | GPL-2.0-with-classpath-exception |
 | Node.js | MIT |
 | REA (`rea-agents`) | MIT |
 | Qt6 runtime (Hopper's dependency) | LGPL-3.0 |

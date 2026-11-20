@@ -18,9 +18,9 @@ services:
   rea-mcp-http:
     # Works with whichever engine image you are running: set REA_IMAGE +
     # REA_ENGINE in .env to match (see docs/IMAGES.md), e.g.
-    #   REA_IMAGE=rea-agent-hopper:6.9.0-linux-amd64 REA_ENGINE=hopper
+    #   REA_IMAGE=rea-agent-hopper:6.10.1-linux-amd64 REA_ENGINE=hopper
     # `make http-up-ghidra` / `-hopper` / `-ida` do this for you.
-    image: ${REA_IMAGE:-ghcr.io/alexmi256/rea-agent:6.9.0-linux-amd64}
+    image: ${REA_IMAGE:-ghcr.io/alexmi256/rea-agent:6.10.1-linux-amd64}
     container_name: ${REA_MCP_HTTP_CONTAINER_NAME:-rea-mcp-http}
     platform: linux/amd64
     init: true
@@ -36,7 +36,7 @@ services:
       # an engine path that differs from the image default.
       REA_ENGINE: ${REA_ENGINE:-all}
       GHIDRA_INSTALL_DIR: ${GHIDRA_INSTALL_DIR:-/opt/ghidra}
-      JAVA_HOME: ${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}
+      JAVA_HOME: ${JAVA_HOME:-/usr/lib/jvm/java-25-openjdk-amd64}
       HOPPER_LAUNCHER_PATH: ${HOPPER_LAUNCHER_PATH:-/opt/hopper/bin/Hopper}
       HOPPER_STATE_DIR: ${HOPPER_STATE_DIR:-/home/rea/.local/share/hopper}
       REA_GHIDRA_STARTUP_TIMEOUT_MS: ${REA_GHIDRA_STARTUP_TIMEOUT_MS:-900000}

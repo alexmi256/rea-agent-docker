@@ -2,12 +2,12 @@
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 rea-agent verification
-run:       20261113T095627Z
-date:      2026-11-13T10:08:44Z
-image:     ghcr.io/alexmi256/rea-agent:6.9.0-linux-amd64
+run:       20261120T091917Z
+date:      2026-11-20T09:31:13Z
+image:     ghcr.io/alexmi256/rea-agent:6.10.1-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.22.3
-rea:       6.9.0
+rea:       6.10.1
 passed:    121
 failed:    0
 skipped:   3
@@ -26,30 +26,34 @@ Interpretation of the 3 skips (all conditional, none an image defect):
       Bring-your-own commercial engines; skipped because no registration was
       configured for this run.
 
-The counts are unchanged against the 6.8.0 sweep - `all` 121/0/3, `ghidra`
-109/0/8, `hopper` 102/0/7, `ida` 94/0/11 - which is what a REA release that adds
-capability but no new tool requirement looks like from this harness. REA 6.9.0
-adds desktop build computers, more shipped-artifact formats (UnityFS, Godot PCK,
-Zstandard ZIP members, Intel HEX/S-record/uImage/FIT/ESP-flash/UF2/DfuSe
-firmware), offline NTFS journal and V8 code-cache inspection, and OpenAPI/GraphQL
-inventory - all parsed by REA itself, so the image needs no new helper, and the
-checker reports 0 actionable and 0 unverifiable rows against the new release.
+The counts are unchanged against the 6.9.0 and 6.8.0 sweeps - `all` 121/0/3,
+`ghidra` 109/0/8, `hopper` 102/0/7, `ida` 94/0/11 - which is what a REA release
+that adds capability but no new tool requirement looks like from this harness.
+REA 6.10.0 adds UEFI firmware volumes and AMI NVRAM, Android boot images and OTA
+payloads, ELF dependency/DWARF/debug-link readers, Maven/Gradle/NuGet metadata
+inspection and CycloneDX SBOM export - all parsed by REA itself, so the image
+needs no new helper, and the checker reports 0 actionable and 0 unverifiable
+rows against the new release.
 
-What the 6.9.0 run establishes beyond the 6.8.0 round: the image runs on Node
-24.22.3 (the 6.8.0 engines.node range is unchanged, so 24.22.1 was still legal -
-this is the current patch on that line, not a new floor); the catalog is now
-255 MCP tools (bundled skill v62, up from v49/229, which also added a
-`desktop-build` reference); and no engine or helper admission moved - Ghidra is
-still the verified build 12.1.4/Java 21 and Hopper is still the vendor feed's
-6.6.2 demo (launcher 226800f1...), re-proved on every Hopper image from the
-retained signed evidence.
+What the 6.10.1 run establishes beyond the 6.9.0 round: two admissions moved and
+both are hard gates, not preferences. Ghidra is now the verified build **12.2**
+(6.10 refuses anything below it, so the previous 12.1.4 pin would have been
+`unsupported`), and the JDK is now **25** (`SUPPORTED_GHIDRA_JAVA_MAJOR` = 25;
+`openjdk-25-jdk-headless` 25.0.5.1 from noble, and `ghidra-java` in `rea doctor`
+reports "accepted a 64-bit full JDK 25 or newer"). Nothing else moved: Node stays
+24.22.3 on an unchanged engines.node range, Hopper is still the vendor feed's
+6.6.2 demo (launcher 226800f1...), and every REA-admitted helper stays on the
+build the release admits. The catalog is now **263 MCP tools** (bundled skill
+v63, up from 255/v62).
 
-Two 6.9.0 changes did have to be fixed before this sweep could be green, and
-both are recorded in docs/VERIFICATION.md: the Chromium sandbox gate now demands
-the literal `REA_BROWSER_NO_SANDBOX=true` (the old `1` left the sandbox on and
-killed the Playwright launch inside the container), and the Wakaru recovery guide
-moved to docs/guides/javascript/, so the checker reads a candidate list of paths
-instead of one hardcoded one.
+6.10 is a large breaking release (evidence_format 2 and explicit subject
+identities, `rea mcp` only, MCP schema-profile removal, IDA `protocol: "native"`,
+Ghidra/Hopper `analysis_profile.parameters.producer`), and none of it required an
+image change beyond those two admissions: the harness asserts outcomes rather
+than the removed fields, the image already invoked `rea mcp`, it already used the
+`compact` MCP input profile, and its IDA template already said `native`. Details
+and the user-side consequences (recreate 6.9-era Evidence before `compare_*`) are
+in docs/VERIFICATION.md.
 
 Verified in this run: Ghidra analyze/function/decompile/instructions (x86-64),
 import+search across AArch64/ARMv7/MIPS32 BE+LE/RISC-V64/PowerPC/PE32+, AArch64
@@ -61,6 +65,6 @@ probe, firmware regions + extraction, artifact inspect/extract with containment
 and cleanup verified, HAR + live mitmdump capture, Chrome CDP
 target/page/screenshot, Playwright launch->click->DOM, tshark pcap fields/summary,
 sigrok decoder search + VCD UART decode, PTY process capture, adb/apktool/JADX,
-frida binding + frida device inventory, MCP stdio handshake (255 tools) +
+frida binding + frida device inventory, MCP stdio handshake (263 tools) +
 engine-free tools/call + Ghidra open_binary/analyze_function/close_binary, and
 the Streamable HTTP bridge.

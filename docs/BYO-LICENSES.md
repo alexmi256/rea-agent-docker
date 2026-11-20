@@ -8,7 +8,7 @@ What this project does is make the bring-your-own step mechanical.
 
 | Engine            | Shipped in the image? | How you supply it                                     | Env / mount                                |
 | ----------------- | --------------------- | ----------------------------------------------------- | ------------------------------------------ |
-| Ghidra 12.1.x     | yes (`REA_ENGINE=all\|ghidra`) | built in, `/opt/ghidra`                    | `GHIDRA_INSTALL_DIR`, `JAVA_HOME`          |
+| Ghidra 12.2        | yes (`REA_ENGINE=all\|ghidra`) | built in, `/opt/ghidra`                    | `GHIDRA_INSTALL_DIR`, `JAVA_HOME`          |
 | Hopper            | yes, **public demo** (`REA_ENGINE=all\|hopper`) | replace `vendor/*.deb` with your licensed package | `HOPPER_LAUNCHER_PATH`, `HOPPER_STATE_DIR` |
 | IDA Pro/Home/Free | **no** (never, in any image) | bind-mount your install (+ `ida.hexlic`)       | `IDADIR`, `~/.idapro/`, `REA_IDA_MCP_CONFIG` |
 | JEB               | **no**                | run JEB yourself, point REA at its MCP endpoint        | `REA_JEB_MCP_URL`                          |
@@ -166,7 +166,7 @@ docker compose exec rea-agent rea inspect-jeb-client --json
 ## What REA itself needs (no licence, already handled)
 
 * Node.js 24 LTS (REA requires 22.19+/24.11+/26+)
-* JDK 21 for Ghidra's JVM bridge
+* JDK 25 for Ghidra 12.2's JVM bridge
 * Python 3 for REA's own helper processes
 * `prlimit` (util-linux) for the firmware/signal/packet/EVM families
 * Several of REA's families are *refused* on non-Linux hosts; this image is

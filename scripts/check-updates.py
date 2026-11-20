@@ -23,8 +23,8 @@
 #       reported and deliberately do NOT fail: by policy they wait for the next
 #       rea-agents release.
 #
-# (2) is the one that matters for the engine and helper tools. REA 6.8.0 admits
-# Ghidra 12.1.4, the Linux Hopper demo the publisher-signed vendor feed currently
+# (2) is the one that matters for the engine and helper tools. REA 6.10.1 admits
+# Ghidra 12.2, the Linux Hopper demo the publisher-signed vendor feed currently
 # offers (Hopper 6.6.2 - the fixed launcher-digest allowlist is gone), Binwalk
 # 3.1.x, Unblob 26.6.x, WABT 1.0.42, sigrok-cli 0.7.2, TShark 4.x,
 # jadx-headless-mcp 0.7.1, pwntools 4.15.0, Wakaru ^1.13.0 - and it refuses
@@ -606,12 +606,19 @@ def check_hopper(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissio
 
 
 def check_java(fetcher: Fetcher, pins: dict[str, str], admissions: ReaAdmissions) -> list[Row]:
-    row = Row("java", "openjdk (Ghidra's JDK)", "Engines", "info", pinned="openjdk-21",
+    # The JDK is not an ARG: derive it from the apt package the Dockerfile installs,
+    # so this row verifies the real pin instead of a literal that can drift from it
+    # (a hardcoded "openjdk-21" once matched nothing after the pin moved, which reads
+    # as a pass while verifying nothing).
+    dockerfile = DOCKERFILE.read_text() if DOCKERFILE.exists() else ""
+    match = re.search(r"openjdk-(\d+)-jdk-headless", dockerfile)
+    pinned_major = match.group(1) if match else "21"
+    row = Row("java", "openjdk (Ghidra's JDK)", "Engines", "info", pinned=f"openjdk-{pinned_major}",
               admits=(f"major {admissions.ghidra_java_major}" if admissions.ghidra_java_major else None),
               source="Launchpad noble/amd64")
     try:
-        row.upstream = launchpad_noble(fetcher, "openjdk-21-jdk-headless")
-        if admissions.ghidra_java_major and "21" not in row.pinned:
+        row.upstream = launchpad_noble(fetcher, f"openjdk-{pinned_major}-jdk-headless")
+        if admissions.ghidra_java_major and admissions.ghidra_java_major != pinned_major:
             row.status = "behind-rea"
             row.hint = "Ghidra's bound JDK major changed"
     except Exception as exc:  # noqa: BLE001
