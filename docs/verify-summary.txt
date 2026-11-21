@@ -2,8 +2,8 @@
 # exact kernel/host string was removed before publishing this repo. Nothing
 # else in these summaries was altered.
 rea-agent verification
-run:       20261120T091917Z
-date:      2026-11-20T09:31:13Z
+run:       20261121T092222Z
+date:      2026-11-21T09:34:19Z
 image:     ghcr.io/alexmi256/rea-agent:6.10.1-linux-amd64
 platform:  Linux x86_64 (kernel string redacted for publication)
 node:      v24.22.3
@@ -41,10 +41,16 @@ both are hard gates, not preferences. Ghidra is now the verified build **12.2**
 `unsupported`), and the JDK is now **25** (`SUPPORTED_GHIDRA_JAVA_MAJOR` = 25;
 `openjdk-25-jdk-headless` 25.0.5.1 from noble, and `ghidra-java` in `rea doctor`
 reports "accepted a 64-bit full JDK 25 or newer"). Nothing else moved: Node stays
-24.22.3 on an unchanged engines.node range, Hopper is still the vendor feed's
-6.6.2 demo (launcher 226800f1...), and every REA-admitted helper stays on the
-build the release admits. The catalog is now **263 MCP tools** (bundled skill
+24.22.3 on an unchanged engines.node range, and every REA-admitted helper stays on
+the build the release admits. The catalog is now **263 MCP tools** (bundled skill
 v63, up from 255/v62).
+
+This sweep is the Hopper feed re-pin of 2026-11-21 on the same 6.10.1 pin set: the
+vendor's signed feed advanced its Ubuntu/Mint demo from 6.6.2 to **6.6.3**, so the
+image now ships `Hopper-6.6.3-Linux-demo.deb` (35,749,278 bytes, sha1 4a37e279...)
+and the launcher REA authenticates is `4d789f44...` (was `226800f1...` for 6.6.2).
+Nothing else in the pin set moved, which is why every count below is identical to
+the 6.10.1, 6.9.0 and 6.8.0 rounds.
 
 6.10 is a large breaking release (evidence_format 2 and explicit subject
 identities, `rea mcp` only, MCP schema-profile removal, IDA `protocol: "native"`,

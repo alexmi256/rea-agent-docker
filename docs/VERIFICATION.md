@@ -64,7 +64,7 @@ image after the engine split):
   `ghidra-java` accepts a 64-bit JDK 25 or newer).
 * `rea doctor --provider hopper --json` → `healthy: true` on `all` and `hopper`;
   `hopper-version` healthy (the launcher SHA-256 is the one the vendor's signed
-  release feed authenticates - `226800f1…` for the shipped Hopper 6.6.2 demo, and
+  release feed authenticates - `4d789f44…` for the shipped Hopper 6.6.3 demo, and
   the image retains that signed evidence so the check also holds offline),
   `hopper-demo-runtime` healthy with `strategy=direct`.
 * Engine injection works with **no environment at all**: `docker run --rm
@@ -274,6 +274,55 @@ Zstandard/instrument-firmware/NTFS-journal/V8-code-cache readers, OpenAPI and
 GraphQL inventory, Playwright trace import) rather than adding a helper tool the
 image must supply. Raw logs: [`docs/verify-engines.txt`](verify-engines.txt).
 
+## Hopper feed re-pin: 6.6.3 (2026-11-21, no REA move)
+
+Same trigger as the previous two rounds, one Hopper release later: the vendor's
+publisher-signed feed moved its Ubuntu/Mint entry from Hopper 6.6.2 to **6.6.3**
+on 2026-11-20 17:41 UTC (changelog: "Fixes issues with package signature"), so
+`make check-updates` reported `BEHIND-REA` on both Hopper rows (2 actionable, 0
+unknown) while `rea-agents` stayed at 6.10.1 — still the newest npm release *and*
+the newest GitHub tag (both published 2026-11-20). No REA bump, no Node move, no
+engine capability change: the images keep `REA_VERSION=6.10.1` and the
+`6.10.1-linux-amd64` tag and are rebuilt in place, exactly as the 6.6.1 and 6.6.2
+rounds were.
+
+The four pins were re-derived from the feed and then verified **against the
+package, not against the feed's own claim**: `Hopper-6.6.3-Linux-demo.deb` was
+downloaded (35,749,278 bytes, sha1 `4a37e279…`), its detached PGP signature
+checked with the vendor key whose primary fingerprint is
+`7C2D73BAFAF5B9A710A69DA1A26DF815099B1BCD` (REA's
+`HOPPER_LINUX_PRIMARY_FINGERPRINT`; good signature from the signing subkey
+`868AD58E…`), and `opt/hopper/bin/Hopper` hashed out of the unpacked package —
+`4d789f44…`, matching the feed's `main_exe_hash`.
+
+| pin | value |
+| --- | --- |
+| `HOPPER_DEMO_VERSION` | `6.6.3` |
+| package | `Hopper-6.6.3-Linux-demo.deb`, 35,749,278 bytes |
+| `HOPPER_DEB_SHA1` | `4a37e279e2c80ac289c5c4ee8a584ab19edcb8fc` |
+| `HOPPER_LAUNCHER_SHA256` | `4d789f449865d27bd823f0e40d41f0dc999187c7ac87360526773032f6976475` |
+
+The build re-checks all four against the live feed, verifies the download (byte
+length + SHA-1) and the installed launcher, and bakes the signed evidence under
+`/home/rea/.cache/rea/hopper-releases/4d789f44…/` (`archive`, `release.json`,
+`public-key.asc`); `rea doctor --provider hopper --json` reports
+`reported_release_version: "6.6.3"`, `launcher_sha256: 4d789f44…`,
+`source: signed_package_cache` on both Hopper-carrying images.
+
+Full harness on all four rebuilt images: **all 121/0/3 · ghidra 109/0/8 ·
+hopper 102/0/7 · ida 94/0/11** — 0 failures, exit 0 on every image (runs
+`20261121T092222Z` / `20261121T093420Z` / `20261121T094606Z` /
+`20261121T094801Z`; full log in [`docs/verify-engines.txt`](verify-engines.txt)).
+Counts are identical to the 6.10.1 round on every image, the expected result for
+a package swap that adds no capability. `make check-updates` is back to
+**0 actionable / 0 unknown / 0 unverifiable**.
+
+Nothing else moved. Node 24.22.3 stays on REA 6.10.1's unchanged `engines.node`
+range; mitmproxy 12.3.1, uv 0.13.9, pwndbg 2026.10.28, frida 17.27.4,
+supergateway 4.2.2 and pwntools 4.15.1 are `OUTDATED`/`info` upstream-only moves
+that wait for the next REA release by policy. The installed client-side skill is
+still REA's bundled **v63 / 263 tools**, matching the image's own copy.
+
 ## Hopper feed re-pin: 6.6.2 (2026-11-07, no REA move)
 
 Same trigger as the previous round, one Hopper release later: the vendor's
@@ -443,6 +492,7 @@ frida 17.25.0, uv 0.13.6, supergateway 4.2.1, mitmproxy 12.3.1, pwndbg
 | `20261013T182120Z` (final full, single image) | **88 passed / 0 failed / 14 skipped, exit 0** before the engine split; checked in at [`docs/verify-summary.txt`](verify-summary.txt) |
 | per-engine full sweep (first, pre-healthcheck-fix images) | all 94/0/14 · ghidra 83/0/18 · hopper 77/0/16 · ida 70/0/19 — **0 failures on all four**; it also caught the leftovers that are now fixed (healthcheck demanding Hopper on every image, `engine.env` shadowed by the `./config` mount, `set -u` aborts on single-engine images) |
 | per-engine full sweep (final images) | see `docs/verify-engines.txt` |
+| **Local per-engine sweep, Hopper feed re-pin (2026-11-21)** | all **121/0/3** · ghidra **109/0/8** · hopper **102/0/7** · ida **94/0/11** — 0 failures on all four, exit 0 on every image; runs `20261121T092222Z` / `20261121T093420Z` / `20261121T094606Z` / `20261121T094801Z`, full log regenerated in [`docs/verify-engines.txt`](verify-engines.txt). `rea-agents` 6.10.1 moved nothing (still newest on npm and GitHub); the trigger was the vendor's signed Hopper feed advancing **6.6.2 → 6.6.3** on 2026-11-20, so the previous pin was refused at run time and by the build layer. The new pin was verified against the **package** rather than the feed's claim: the `.deb`'s detached PGP signature verifies under the vendor key `7C2D73BA…099B1BCD` (REA's primary fingerprint), and `opt/hopper/bin/Hopper` hashed out of the unpacked package equals the feed's `main_exe_hash` (`4d789f44…`). Counts are **identical to the 6.10.1 round on every image**; `doctor` reports `6.6.3` with `source: signed_package_cache`. |
 | **CI, GitHub-hosted runner (quick profile)** | **59 passed / 0 failed / 13 skipped** — run [38474640500](https://github.com/alexmi256/rea-agent-docker/actions/runs/38474640500), ghidra image built on the runner in 8m52s, harness executed as the runner's uid (not the image's), artifact `verification-report-ghidra` uploaded. This run is also the regression test for the two defects CI found: the entrypoint dying on a foreign uid, and the un-gated Hopper state-dir check. |
 | **CI publish run (all four, REA 6.4.0)** | run [38481777484](https://github.com/alexmi256/rea-agent-docker/actions/runs/38481777484) — every engine image built on a hosted runner (ida 10m0s, hopper 9m10s, ghidra 11m42s, all-engines longest), quick harness green on each, then published to `ghcr.io/alexmi256/rea-agent[-ghidra\|-hopper\|-ida]` with tags `6.4.0-linux-amd64` and `latest`. Public access verified independently of the CI log: `docker manifest inspect` on all four tags succeeds **anonymously** (no `ghcr.io` credentials on the machine doing the check). |
 | **Local per-engine sweep, REA 6.5.0** | all 107/0/3 · ghidra 95/0/8 · hopper 88/0/7 · ida 80/0/11 — **0 failures on all four**, exit 0 on every image. The first pass caught one harness defect (`sigrok decoder inventory` asserted `uart` appeared in the decoder catalog's default 50-of-111 page); fixed by searching with `inspect-signal-decoders --query uart` and re-run. Also newly green relative to 6.4.0: sqlite, wasm, go-binary, pcap ×3, signal ×2, frida, and the RISC-V64/PowerPC ELF searches. |

@@ -55,18 +55,18 @@ into REA's own cache path so REA can admit the launcher offline:
 The build log prints what it verified:
 
 ```
-vendor feed offers Linux Hopper 6.6.2 (Hopper-6.6.2-Linux-demo.deb, 35749280 bytes)
-Hopper launcher sha256: 226800f1…
-retained publisher-signed Hopper evidence: /home/rea/.cache/rea/hopper-releases/226800f1…
+vendor feed offers Linux Hopper 6.6.3 (Hopper-6.6.3-Linux-demo.deb, 35749278 bytes)
+Hopper launcher sha256: 4d789f44…
+retained publisher-signed Hopper evidence: /home/rea/.cache/rea/hopper-releases/4d789f44…
 ```
 
 ```bash
-# default (public demo 6.6.2 - the build the vendor feed authenticates today)
+# default (public demo 6.6.3 - the build the vendor feed authenticates today)
 make build            # the all-engines image
 make build-hopper     # the Hopper-only image
 
 # licensed package: drop the DEB into vendor/ and rebuild
-cp ~/Downloads/Hopper-6.6.2-Linux.deb vendor/
+cp ~/Downloads/Hopper-6.6.3-Linux.deb vendor/
 scripts/build.sh --engine hopper        # or ENGINE=all / make build
 docker compose --profile hopper up -d rea-hopper
 docker compose exec rea-hopper rea doctor --provider hopper --json
